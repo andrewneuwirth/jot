@@ -16,6 +16,9 @@ import ServiceManagement
     private var cancelled = false
     private var noteTarget: UUID?
     private var noteOriginal = ""
+    private var noteExpected = ""
+    private var noteInsertionPaused = false
+    private var currentAudioURL: URL?
     private var session = UUID()
     @Published var state = "Loading model…"
     @Published var ready = false
@@ -80,6 +83,7 @@ import ServiceManagement
         insertion.capture()
         noteTarget = note
         noteOriginal = library.notes.first(where: { $0.id == note })?.body ?? ""
+        noteExpected = noteOriginal; noteInsertionPaused = false; currentAudioURL = nil
         transcript = ""; notice = ""; cancelled = false; seconds = 0; level = 0
         let current = UUID(); session = current
         recording = true; showOverlay = true; state = "Starting…"; overlayChanged?()
@@ -91,6 +95,7 @@ import ServiceManagement
                 } }
                 guard recording, !cancelled else { recording = false; finishing = false; state = "Ready"; showOverlay = false; overlayChanged?(); return }
                 let stream = try recorder.start(deviceID: microphoneID == 0 ? nil : microphoneID)
+                currentAudioURL = recorder.url
                 started = Date(); state = "Recording"
                 timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in Task { @MainActor in
                     guard let self else { return }; self.seconds = Date().timeIntervalSince(self.started)
@@ -102,7 +107,7 @@ import ServiceManagement
             } catch {
                 recorder.stop(); timer?.invalidate(); recording = false; finishing = false
                 state = "Ready"; notice = "Dictation failed: \(error.localizedDescription). Your recording is in History."
-                library.add(Dictation(text: transcript, audioFile: recorder.url?.lastPathComponent, duration: seconds, finishMS: 0, model: mode.modelName, destination: insertion.destination, status: "Failed · retry available"))
+                library.add(Dictation(text: transcript, audioFile: currentAudioURL?.lastPathComponent, duration: seconds, finishMS: 0, model: mode.modelName, destination: insertion.destination, status: "Failed · retry available"))
                 overlayChanged?()
             }
         }
@@ -110,7 +115,9 @@ import ServiceManagement
     private func receive(_ text: String) {
         transcript = TranscriptTools.applyVocabulary(text, rules: library.vocabulary)
         if let id = noteTarget, let i = library.notes.firstIndex(where: { $0.id == id }) {
-            library.notes[i].body = noteOriginal + (noteOriginal.isEmpty ? "" : "\n") + transcript
+            guard !noteInsertionPaused, library.notes[i].body == noteExpected else { noteInsertionPaused = true; return }
+            noteExpected = noteOriginal + (noteOriginal.isEmpty ? "" : "\n") + transcript
+            library.notes[i].body = noteExpected
         } else if liveInsertion, insertion.available { _ = insertion.update(transcript) }
         overlayChanged?()
     }
@@ -118,7 +125,8 @@ import ServiceManagement
         guard recording else { return }
         finishing = true; recording = false; state = "Finishing…"; stopped = Date(); timer?.invalidate()
         // Keep a brief physical tail for a key press that overlaps the final phoneme.
-        Task { try? await Task.sleep(nanoseconds: 160_000_000); recorder.stop() }
+        let stoppingSession = session
+        Task { try? await Task.sleep(nanoseconds: 160_000_000); if session == stoppingSession { recorder.stop() } }
         overlayChanged?()
     }
     func cancel() { guard recording else { return }; cancelled = true; insertion.cancel(); stop() }
@@ -128,20 +136,22 @@ import ServiceManagement
         let ms = Date().timeIntervalSince(stopped) * 1000
         var status = "Saved to history"
         if cancelled {
-            if let id = noteTarget, let i = library.notes.firstIndex(where: { $0.id == id }) { library.notes[i].body = noteOriginal }
+            if let id = noteTarget, let i = library.notes.firstIndex(where: { $0.id == id }), !noteInsertionPaused, library.notes[i].body == noteExpected { library.notes[i].body = noteOriginal }
             status = "Cancelled · recovered in history"; notice = "Cancelled. Recording is available in History."
         } else if text.isEmpty { status = "No speech detected · retry available"; notice = "No words detected. Your recording is available in History." }
         else if let id = noteTarget, let i = library.notes.firstIndex(where: { $0.id == id }) {
-            library.notes[i].body = noteOriginal + (noteOriginal.isEmpty ? "" : "\n") + text
-            library.notes[i].updated = Date(); library.save(); status = "Saved to note"
+            if !noteInsertionPaused, library.notes[i].body == noteExpected {
+                library.notes[i].body = noteOriginal + (noteOriginal.isEmpty ? "" : "\n") + text
+                library.notes[i].updated = Date(); library.save(); status = "Saved to note"
+            } else { notice = "Your note changed while recording. Full transcript saved in History." }
         } else if !liveInsertion, insertion.pasteFinal(text) { status = "Paste requested in \(insertion.destination)" }
         else if liveInsertion, insertion.update(text) { status = "Inserted in \(insertion.destination)" }
         else if liveInsertion, !insertion.available, insertion.pasteFinal(text) { status = "Paste requested in \(insertion.destination)" }
         else { notice = insertion.inserted.isEmpty ? "Transcript ready. Copy it below and paste where you want." : "Text focus changed. Full transcript saved; copy it below if needed." }
         let recover = keepAudio || cancelled || text.isEmpty || status == "Saved to history"
-        let audio = recorder.url?.lastPathComponent
+        let audio = currentAudioURL?.lastPathComponent
         library.add(Dictation(text: text, audioFile: recover ? audio : nil, duration: seconds, finishMS: ms, model: mode.modelName, destination: noteTarget == nil ? insertion.destination : "Jot note", status: status))
-        if !recover, let path = recorder.url { try? FileManager.default.removeItem(at: path) }
+        if !recover, let path = currentAudioURL { try? FileManager.default.removeItem(at: path) }
         transcript = text
         if notice.isEmpty { Task { try? await Task.sleep(nanoseconds: 700_000_000); if !recording && !finishing { showOverlay = false; overlayChanged?() } } }
         overlayChanged?()
