@@ -1,0 +1,1 @@
+jfk.wav: public inaugural-address excerpt, downloaded from https://raw.githubusercontent.com/ggml-org/whisper.cpp/master/samples/jfk.wav for a reproducible smoke benchmark. Full reference: And so my fellow Americans ask not what your country can do for you ask what you can do for your country.
