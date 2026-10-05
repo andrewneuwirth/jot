@@ -35,14 +35,14 @@ actor ApplePreview {
         self.analyzer = analyzer
         let stream = AsyncStream<AnalyzerInput> { input = $0 }
         reader = Task {
-            var finalized = ""
+            var transcript = PreviewTranscript()
             do {
                 for try await result in module.results {
                     let text = String(result.text.characters)
-                    let display = finalized + text
+                    let display = transcript.update(start: result.range.start.seconds,
+                        end: CMTimeRangeGetEnd(result.range).seconds, text: text, isFinal: result.isFinal)
                     lastText = display
                     partial(display.trimmingCharacters(in: .whitespacesAndNewlines))
-                    if result.isFinal { finalized = display }
                 }
             } catch { /* Preview is optional; original audio still goes to Ultra. */ }
         }

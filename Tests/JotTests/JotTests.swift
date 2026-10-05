@@ -88,4 +88,26 @@ final class JotTests: XCTestCase {
         await preview.stop()
     }
 
+    func testPreviewKeepsSeparatePhrasesAcrossPauses() {
+        var t = PreviewTranscript()
+        XCTAssertEqual(t.update(start: 0, end: 2, text: "First sentence.", isFinal: false), "First sentence.")
+        XCTAssertEqual(t.update(start: 3, end: 4, text: "Second", isFinal: false), "First sentence. Second")
+        XCTAssertEqual(t.update(start: 3, end: 5, text: "Second sentence.", isFinal: true), "First sentence. Second sentence.")
+        XCTAssertEqual(t.update(start: 6, end: 7, text: "", isFinal: false), "First sentence. Second sentence.")
+    }
+    func testPreviewRevisionsAndRepeatedFinalDoNotDuplicate() {
+        var t = PreviewTranscript()
+        _ = t.update(start: 0, end: 1, text: "I thing", isFinal: false)
+        XCTAssertEqual(t.update(start: 0, end: 2, text: "I think so.", isFinal: true), "I think so.")
+        XCTAssertEqual(t.update(start: 0, end: 2, text: "I think so.", isFinal: true), "I think so.")
+        XCTAssertEqual(t.update(start: 0, end: 2, text: "", isFinal: false), "I think so.")
+        XCTAssertEqual(t.update(start: 3, end: 5, text: "I think so.", isFinal: true), "I think so. I think so.")
+    }
+    func testPreviewRevokesOnlyTheAffectedProvisionalRange() {
+        var t = PreviewTranscript()
+        _ = t.update(start: 0, end: 2, text: "Keep this.", isFinal: true)
+        _ = t.update(start: 3, end: 4, text: "Noise", isFinal: false)
+        XCTAssertEqual(t.update(start: 3, end: 4, text: "", isFinal: false), "Keep this.")
+    }
+
 }

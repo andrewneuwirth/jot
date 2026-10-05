@@ -271,12 +271,12 @@ struct RecordingView: View {
                     RoundedRectangle(cornerRadius: 2).fill(LinearGradient(colors: [Color(red: 0.35, green: 0.72, blue: 1), jotBlue], startPoint: .top, endPoint: .bottom))
                         .frame(width: 3, height: CGFloat(4 + model.level * Float(7 + i * 3)))
                 } }.frame(width: 34, height: 22)
-                Text(model.recording ? String(format: "%d:%02d", Int(model.seconds) / 60, Int(model.seconds) % 60) : model.state)
+                Text(model.recording ? String(format: "%d:%02d", Int(model.seconds) / 60, Int(model.seconds) % 60) : "Processing")
                     .font(.system(size: 11, weight: .medium)).monospacedDigit().lineLimit(1)
                 Spacer(minLength: 0)
                 if model.recording {
                     Button { model.stop() } label: { Image(systemName: "stop.fill").font(.system(size: 9)).frame(width: 24, height: 24).background(LinearGradient(colors: [Color(red: 0.26, green: 0.61, blue: 1), jotBlue], startPoint: .topLeading, endPoint: .bottomTrailing), in: Circle()).overlay(Circle().strokeBorder(.white.opacity(0.22), lineWidth: 0.7)).shadow(color: jotBlue.opacity(0.45), radius: 7) }.help("Finish dictation")
-                } else if model.finishing { ProgressView().controlSize(.mini) }
+                } else if model.finishing { ProcessingGlow().frame(width: 24, height: 24) }
                 else {
                     if !model.transcript.isEmpty { Button { TextInsertion.copy(model.transcript) } label: { Image(systemName: "doc.on.doc") }.help("Copy transcript") }
                     Button { model.showOverlay = false; model.overlayChanged?() } label: { Image(systemName: "xmark") }.help("Dismiss")
@@ -294,5 +294,22 @@ struct RecordingView: View {
         }.padding(12).frame(width: 228, height: OverlayLayout.height(model.transcript) - 8).foregroundStyle(.white)
             .background(LinearGradient(colors: [Color(red: 0.08, green: 0.12, blue: 0.18), Color(red: 0.045, green: 0.075, blue: 0.12)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 16))
             .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(jotBlue.opacity(0.22))).padding(4)
+    }
+}
+
+private struct ProcessingGlow: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { timeline in
+            let angle = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.1) / 1.1 * 360
+            ZStack {
+                Circle().fill(jotBlue.opacity(0.12))
+                Circle().stroke(jotBlue.opacity(0.18), lineWidth: 2)
+                Circle().trim(from: 0.08, to: 0.88)
+                    .stroke(AngularGradient(colors: [jotBlue.opacity(0.05), jotBlue, .cyan, .white], center: .center), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    .rotationEffect(.degrees(angle))
+                    .shadow(color: jotBlue.opacity(0.8), radius: 5)
+            }.padding(2)
+        }.accessibilityLabel("Processing dictation")
     }
 }

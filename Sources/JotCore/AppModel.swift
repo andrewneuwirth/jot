@@ -111,7 +111,7 @@ import ServiceManagement
                 let final = TranscriptTools.applyVocabulary(raw, rules: library.vocabulary)
                 complete(final)
             } catch {
-                recorder.stop(); timer?.invalidate(); recording = false; finishing = false
+                recorder.stop(); timer?.invalidate(); recording = false; finishing = false; showOverlay = false
                 state = "Ready"; notice = "Dictation failed: \(error.localizedDescription). Your recording is in History."
                 library.add(Dictation(text: transcript, audioFile: currentAudioURL?.lastPathComponent, duration: seconds, finishMS: 0, model: mode.modelName, destination: insertion.destination, status: "Failed · retry available"))
                 overlayChanged?()
@@ -159,15 +159,7 @@ import ServiceManagement
         library.add(Dictation(text: text, audioFile: recover ? audio : nil, duration: seconds, finishMS: ms, model: mode.modelName, destination: noteTarget == nil ? insertion.destination : "Jot note", status: status))
         if !recover, let path = currentAudioURL { try? FileManager.default.removeItem(at: path) }
         transcript = text
-        if text.isEmpty || cancelled {
-            showOverlay = false
-        } else if notice.isEmpty {
-            let completedSession = session
-            Task {
-                try? await Task.sleep(nanoseconds: 700_000_000)
-                if session == completedSession, !recording, !finishing { showOverlay = false; overlayChanged?() }
-            }
-        }
+        showOverlay = false
         overlayChanged?()
     }
     func newNote() { section = "Notes"; selection = library.addNote() }

@@ -57,7 +57,7 @@ import SwiftUI
         NSApp.terminate(nil)
     }
     private func updatePill() {
-        guard model.showOverlay else { pill?.orderOut(nil); return }
+        guard model.showOverlay, model.recording || model.finishing else { pill?.orderOut(nil); return }
         if pill == nil {
             let p = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 236, height: 80), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
             p.isFloatingPanel = true; p.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1); p.hidesOnDeactivate = false; p.isOpaque = false; p.backgroundColor = .clear; p.hasShadow = true; p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
