@@ -4,34 +4,61 @@ import CoreML
 import FluidAudio
 
 public enum SpeechMode: String, CaseIterable, Identifiable {
-    case fast = "160", balanced = "320"
+    case ultra = "ultra", fast = "160", balanced = "320"
     public var id: String { rawValue }
-    public var title: String { self == .fast ? "Realtime · 160 ms" : "Balanced · 320 ms" }
-    public var modelName: String { "Parakeet Realtime EOU 120M · \(rawValue) ms" }
+    public var title: String { self == .ultra ? "Ultra + Apple live preview" : (self == .fast ? "Realtime · 160 ms" : "Balanced · 320 ms") }
+    public var modelName: String { self == .ultra ? "Parakeet Ultra · Apple preview" : "Parakeet Realtime EOU 120M · \(rawValue) ms" }
     var chunk: StreamingChunkSize { self == .fast ? .ms160 : .ms320 }
 }
 public actor SpeechEngine {
     private var manager: StreamingEouAsrManager?
     private var loadedMode: SpeechMode?
+    private var ultra: AsrManager?
+    private let apple = ApplePreview()
+    public private(set) var previewStatus = "Apple on-device speech"
+
     public init() {}
     public func load(_ mode: SpeechMode) async throws {
         if loadedMode == mode, manager != nil { return }
         try JotPaths.prepare()
         let config = MLModelConfiguration(); config.computeUnits = .cpuAndNeuralEngine
+        if mode == .ultra {
+            let models = try await AsrModels.downloadAndLoad(to: JotPaths.models.appendingPathComponent("parakeet-ultra"), configuration: config, version: .ultra)
+            let next = AsrManager(config: .default)
+            try await next.loadModels(models)
+            ultra = next; manager = nil; loadedMode = mode
+            do { try await apple.prepare(); previewStatus = "Apple on-device speech" }
+            catch { previewStatus = error.localizedDescription }
+            return
+        }
+        ultra = nil
         let next = StreamingEouAsrManager(configuration: config, chunkSize: mode.chunk)
         try await next.loadModels(to: JotPaths.models)
         manager = next; loadedMode = mode
     }
     public func begin(partial: @escaping @Sendable (String) -> Void) async throws {
+        if loadedMode == .ultra {
+            do { try await apple.begin(partial: partial) }
+            catch { previewStatus = error.localizedDescription }
+            return
+        }
         guard let manager else { throw JotError.message("Download and load the model first.") }
         await manager.reset()
         await manager.setPartialCallback(partial)
     }
     public func process(_ buffer: AVAudioPCMBuffer) async throws {
+        if loadedMode == .ultra { await apple.append(buffer); return }
         guard let manager else { throw JotError.message("Model is not loaded.") }
         _ = try await manager.process(audioBuffer: buffer)
     }
-    public func finish() async throws -> String {
+    public func finish(recordingURL: URL? = nil) async throws -> String {
+        if loadedMode == .ultra {
+            await apple.stop()
+            guard let ultra, let recordingURL else { throw JotError.message("Original recording is unavailable for Ultra.") }
+            var state = TdtDecoderState.make(decoderLayers: await ultra.decoderLayerCount)
+            let result = try await ultra.transcribe(recordingURL, decoderState: &state)
+            return result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         guard let manager else { throw JotError.message("Model is not loaded.") }
         // A short synthetic silence flushes the encoder's right context without
         // waiting for a long real-time silence detector or throwing away audio.
@@ -45,18 +72,18 @@ public actor SpeechEngine {
     public func transcribeFile(_ url: URL, mode: SpeechMode, source: String, reference: String? = nil,
                                partial: @escaping @Sendable (String) -> Void = { _ in }) async throws -> Benchmark {
         try await load(mode)
-        try await begin(partial: partial)
+        if mode != .ultra { try await begin(partial: partial) }
         let file = try AVAudioFile(forReading: url)
         let start = Date()
         let frames = AVAudioFrameCount(max(1, Int(file.processingFormat.sampleRate * 0.16)))
-        while file.framePosition < file.length {
+        while mode != .ultra && file.framePosition < file.length {
             try Task.checkCancellation()
             let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: frames)!
             try file.read(into: buffer)
             if buffer.frameLength > 0 { try await process(buffer) }
         }
         let finalStart = Date()
-        let text = try await finish()
+        let text = try await finish(recordingURL: url)
         let elapsed = Date().timeIntervalSince(start)
         let finalMS = Date().timeIntervalSince(finalStart) * 1000
         let duration = Double(file.length) / file.processingFormat.sampleRate

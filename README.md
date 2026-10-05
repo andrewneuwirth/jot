@@ -1,6 +1,6 @@
 # Jot
 
-A local macOS dictation and notes app. Native SwiftUI/AppKit, NVIDIA Parakeet Realtime EOU 120M through FluidAudio/Core ML, purple accents, menu-bar recording. No server, account, analytics, or cloud transcription.
+A local macOS dictation and notes app. Native SwiftUI/AppKit, NVIDIA Parakeet Realtime EOU 120M through FluidAudio/Core ML, blue accents, menu-bar recording. No server, account, analytics, or cloud transcription.
 
 ## Use
 
@@ -17,7 +17,7 @@ Live updates use the target app's Accessibility text interface and stop if focus
 
 ## Models and measurements
 
-Selected default: `FluidInference/parakeet-realtime-eou-120m-coreml`, 160 ms variant of NVIDIA's English-only EOU 120M streaming model. 320 ms is also selectable. Initial download is online; inference is local. Assets are cached under `~/Library/Application Support/Jot/Models`. Chunk duration is not end-to-end latency or a speed claim.
+Selected default: `FluidInference/parakeet-ultra-coreml` for final transcription of the original microphone audio, with Apple SpeechAnalyzer / SpeechTranscriber providing local live previews. The small EOU model is not loaded in Ultra mode; legacy 160/320 ms modes remain selectable. Initial download is online; inference is local. Assets are cached under `~/Library/Application Support/Jot/Models`. Chunk duration is not end-to-end latency or a speed claim.
 
 Benchmarks show real audio duration, processing time, realtime multiplier, flush latency, hardware and transcript. WER is computed only with an explicit reference. Model load is excluded. A file benchmark is not a microphone latency test. Actual dictation history separately records stop-to-finish duration.
 
@@ -31,7 +31,7 @@ JOT_ADHOC=1 ./build.sh          # local development fallback without signing key
 .build/release/Jot --benchmark Tests/Fixtures/jfk.wav --320
 ```
 
-Swift 6.2+ and macOS 15+ on Apple Silicon. Dependency revision is pinned in Package.swift and Package.resolved.
+Swift 6.2+ and macOS 26+ on Apple Silicon. Dependency revision is pinned in Package.swift and Package.resolved.
 
 ## Privacy and storage
 

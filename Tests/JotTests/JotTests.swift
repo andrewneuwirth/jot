@@ -65,4 +65,27 @@ final class JotTests: XCTestCase {
         XCTAssertFalse(TextInsertion.requiresFinalPaste(bundleID: "com.apple.TextEdit", value: "Existing draft", placeholder: nil))
     }
 
+    func testOverlayOnlyGrowsWhenTextWraps() {
+        XCTAssertEqual(OverlayLayout.height(""), OverlayLayout.height("one short line"))
+        XCTAssertGreaterThan(OverlayLayout.height(String(repeating: "a long sentence ", count: 12)), OverlayLayout.height("short"))
+        XCTAssertLessThanOrEqual(OverlayLayout.height(String(repeating: "word ", count: 1000)), 110)
+    }
+
+    func testAppleOnDevicePreviewFromFixture() async throws {
+        guard ProcessInfo.processInfo.environment["JOT_INTEGRATION"] == "1" else { throw XCTSkip("Explicit local speech integration check") }
+        let preview = ApplePreview()
+        try await preview.prepare()
+        try await preview.begin { _ in }
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Fixtures/jfk.wav")
+        let file = try AVAudioFile(forReading: url)
+        while file.framePosition < file.length {
+            let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: 4096)!
+            try file.read(into: buffer)
+            await preview.append(buffer)
+        }
+        let result = try await preview.finish()
+        XCTAssertTrue(result.lowercased().contains("country"), "Apple preview: \(result)")
+        await preview.stop()
+    }
+
 }

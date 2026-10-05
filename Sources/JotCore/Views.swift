@@ -4,7 +4,7 @@ import AVFoundation
 import CoreAudio
 import ServiceManagement
 
-private let purple = Color(red: 0.49, green: 0.36, blue: 0.77)
+private let jotBlue = Color(red: 0.20, green: 0.55, blue: 0.98)
 struct MainView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var library: Library
@@ -29,17 +29,17 @@ struct MainView: View {
                                     VStack(alignment: .leading, spacing: 7) {
                                         Text(entry.text.isEmpty ? "Recording to recover" : entry.text).lineLimit(2).font(.body.weight(.medium))
                                         Text(entry.date.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
-                                    }.frame(maxWidth: .infinity, alignment: .leading).padding(12).background(model.selection == entry.id ? purple.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 10))
+                                    }.frame(maxWidth: .infinity, alignment: .leading).padding(12).background(model.selection == entry.id ? jotBlue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 10))
                                 }.buttonStyle(.plain)
                             }
                         } else {
                             ForEach(filteredNotes) { note in
                                 Button { model.selection = note.id } label: {
                                     VStack(alignment: .leading, spacing: 7) {
-                                        HStack { Text(note.title.isEmpty ? "Untitled note" : note.title).font(.body.weight(.semibold)).lineLimit(1); if note.pinned { Image(systemName: "pin.fill").font(.caption).foregroundStyle(purple) } }
+                                        HStack { Text(note.title.isEmpty ? "Untitled note" : note.title).font(.body.weight(.semibold)).lineLimit(1); if note.pinned { Image(systemName: "pin.fill").font(.caption).foregroundStyle(jotBlue) } }
                                         Text(note.body.isEmpty ? "A little room for a thought." : note.body).font(.callout).foregroundStyle(.secondary).lineLimit(2)
                                         Text(note.updated.formatted(date: .abbreviated, time: .omitted)).font(.caption).foregroundStyle(.tertiary)
-                                    }.frame(maxWidth: .infinity, alignment: .leading).padding(12).background(model.selection == note.id ? purple.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 10))
+                                    }.frame(maxWidth: .infinity, alignment: .leading).padding(12).background(model.selection == note.id ? jotBlue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 10))
                                 }.buttonStyle(.plain)
                             }
                         }
@@ -48,7 +48,7 @@ struct MainView: View {
                 Divider()
                 detail.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-        }.tint(purple).frame(minWidth: 1050, minHeight: 650)
+        }.tint(jotBlue).frame(minWidth: 1050, minHeight: 650)
         .background(Color(nsColor: .textBackgroundColor))
         .sheet(isPresented: $addingFolder) {
             VStack(alignment: .leading, spacing: 20) { Text("New folder").font(.title2.bold()); TextField("Folder name", text: $folderName)
@@ -72,18 +72,18 @@ struct MainView: View {
     }
     var sidebar: some View {
         VStack(alignment: .leading, spacing: 7) {
-            HStack(spacing: 10) { Image(systemName: "waveform").font(.system(size: 26, weight: .medium)).foregroundStyle(purple); Text("Jot").font(.title2.weight(.semibold)) }.padding(.vertical, 20).padding(.horizontal, 15)
+            HStack(spacing: 10) { Image(systemName: "waveform").font(.system(size: 26, weight: .medium)).foregroundStyle(jotBlue); Text("Jot").font(.title2.weight(.semibold)) }.padding(.vertical, 20).padding(.horizontal, 15)
             nav("Notes", "doc.text"); nav("Pinned", "pin"); nav("Dictation History", "clock")
             HStack { Text("Folders").foregroundStyle(.secondary); Spacer(); Button { addingFolder = true } label: { Image(systemName: "plus") }.buttonStyle(.plain) }.font(.caption).padding(.horizontal, 14).padding(.top, 24).padding(.bottom, 5)
             ForEach(library.folders, id: \.self) { nav($0, "folder") }
             Spacer()
-            Button { model.showSettings = true } label: { Label("Settings", systemImage: "gearshape").frame(maxWidth: .infinity, alignment: .leading).padding(11).background(model.showSettings ? purple.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 9)) }.buttonStyle(.plain)
+            Button { model.showSettings = true } label: { Label("Settings", systemImage: "gearshape").frame(maxWidth: .infinity, alignment: .leading).padding(11).background(model.showSettings ? jotBlue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 9)) }.buttonStyle(.plain)
             HStack { Circle().fill(model.recording ? .red : (model.ready ? .green : .orange)).frame(width: 8, height: 8); Text(model.state).font(.caption).lineLimit(2) }.padding(12)
         }.padding(10).background(.regularMaterial)
     }
     func nav(_ title: String, _ icon: String) -> some View {
         Button { model.section = title; model.showSettings = false; model.search = ""; model.selection = title == "Dictation History" ? library.history.first?.id : library.notes.first(where: { title == "Notes" || (title == "Pinned" && $0.pinned) || $0.folder == title })?.id } label: {
-            Label(title, systemImage: icon).frame(maxWidth: .infinity, alignment: .leading).padding(11).background(!model.showSettings && model.section == title ? purple.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 9))
+            Label(title, systemImage: icon).frame(maxWidth: .infinity, alignment: .leading).padding(11).background(!model.showSettings && model.section == title ? jotBlue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 9))
         }.buttonStyle(.plain)
     }
     @ViewBuilder var detail: some View {
@@ -121,7 +121,7 @@ struct MainView: View {
                 }.padding(30)
             }
         } else {
-            VStack(spacing: 18) { Image(systemName: "waveform").font(.system(size: 48)).foregroundStyle(purple); Text(model.section == "Dictation History" ? "Your words, kept safe." : "A little room for a thought.").font(.title2.weight(.semibold)); Text(model.section == "Dictation History" ? "Your recent dictations will appear here." : "Write a note, or let your voice do the typing.").foregroundStyle(.secondary); Button("New note", systemImage: "square.and.pencil") { model.newNote() }.buttonStyle(.borderedProminent) }.frame(maxWidth: .infinity, maxHeight: .infinity)
+            VStack(spacing: 18) { Image(systemName: "waveform").font(.system(size: 48)).foregroundStyle(jotBlue); Text(model.section == "Dictation History" ? "Your words, kept safe." : "A little room for a thought.").font(.title2.weight(.semibold)); Text(model.section == "Dictation History" ? "Your recent dictations will appear here." : "Write a note, or let your voice do the typing.").foregroundStyle(.secondary); Button("New note", systemImage: "square.and.pencil") { model.newNote() }.buttonStyle(.borderedProminent) }.frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
     func noteBinding(_ index: Int, _ path: WritableKeyPath<Note, String>) -> Binding<String> {
@@ -153,13 +153,13 @@ struct SettingsView: View {
                 if page == "Model" {
                 VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 12) {
-                        Label("NVIDIA Parakeet Realtime EOU 120M", systemImage: "waveform").font(.headline)
-                        Text("Selected model · English · Core ML / Apple Neural Engine").font(.callout).foregroundStyle(.secondary)
-                        Picker("Streaming mode", selection: $model.mode) { ForEach(SpeechMode.allCases) { Text($0.title).tag($0) } }.disabled(model.busy || model.recording || model.finishing)
-                        Text("160 ms prioritizes live response. 320 ms gives the model more context. This is the audio chunk size, not a promise of end-to-end latency.").font(.caption).foregroundStyle(.secondary)
+                        Label(model.mode == .ultra ? "Parakeet Ultra" : "NVIDIA Parakeet Realtime EOU 120M", systemImage: "waveform").font(.headline)
+                        Text(model.mode == .ultra ? "Final text: Ultra · Live preview: \(model.previewStatus)" : "Selected model · English · Core ML / Apple Neural Engine").font(.callout).foregroundStyle(.secondary)
+                        Picker("Speech model", selection: $model.mode) { ForEach(SpeechMode.allCases) { Text($0.title).tag($0) } }.disabled(model.busy || model.recording || model.finishing)
+                        Text(model.mode == .ultra ? "Apple supplies live words locally. Ultra transcribes the original audio when you stop; it does not rewrite Apple’s text. Both run on this Mac." : "160 ms prioritizes live response. 320 ms gives the model more context. Chunk size is not end-to-end latency.").font(.caption).foregroundStyle(.secondary)
                         HStack { Label(model.state, systemImage: model.ready ? "checkmark.circle.fill" : "arrow.down.circle"); Spacer(); Button(model.ready ? "Check model" : "Download / retry") { Task { await model.loadModel() } }.disabled(model.busy || model.recording || model.finishing) }
                         Text("Model cache: \(cacheSize) · Warm load: \(Int(model.modelLoadMS)) ms").font(.caption).foregroundStyle(.secondary)
-                        HStack { Link("Model card & license", destination: URL(string: "https://huggingface.co/FluidInference/parakeet-realtime-eou-120m-coreml")!); Button("Show model files") { NSWorkspace.shared.open(JotPaths.models) } }.font(.caption)
+                        HStack { Link("Model card & license", destination: URL(string: model.mode == .ultra ? "https://huggingface.co/FluidInference/parakeet-ultra-coreml" : "https://huggingface.co/FluidInference/parakeet-realtime-eou-120m-coreml")!); Button("Show model files") { NSWorkspace.shared.open(JotPaths.models) } }.font(.caption)
                     }.padding(10).frame(maxWidth: .infinity, alignment: .leading)
                 }.padding(16).background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 14))
                 }
@@ -213,7 +213,7 @@ struct SettingsView: View {
                         if library.benchmarks.isEmpty { Text("No measurements yet. Choose a recording to run a local benchmark.").foregroundStyle(.secondary) }
                         ForEach(library.benchmarks.prefix(12)) { b in
                             VStack(alignment: .leading, spacing: 7) {
-                                HStack { Text(b.model).font(.callout.bold()); Spacer(); Text("\(String(format: "%.1f", b.speed))× realtime").foregroundStyle(purple).font(.headline) }
+                                HStack { Text(b.model).font(.callout.bold()); Spacer(); Text("\(String(format: "%.1f", b.speed))× realtime").foregroundStyle(jotBlue).font(.headline) }
                                 Text("\(b.source) · \(b.date.formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(.secondary)
                                 Text("\(String(format: "%.2f", b.audioSeconds)) s audio → \(String(format: "%.3f", b.processingSeconds)) s processing · \(Int(b.finalizationMS)) ms flush").font(.caption)
                                 if let wer = b.wordErrorRate { Text("Word error rate: \(String(format: "%.1f", wer * 100))% · this clip only").font(.caption) }
@@ -268,14 +268,14 @@ struct RecordingView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 HStack(spacing: 2) { ForEach(0..<7) { i in
-                    RoundedRectangle(cornerRadius: 2).fill(purple)
+                    RoundedRectangle(cornerRadius: 2).fill(LinearGradient(colors: [Color(red: 0.35, green: 0.72, blue: 1), jotBlue], startPoint: .top, endPoint: .bottom))
                         .frame(width: 3, height: CGFloat(4 + model.level * Float(7 + i * 3)))
                 } }.frame(width: 34, height: 22)
                 Text(model.recording ? String(format: "%d:%02d", Int(model.seconds) / 60, Int(model.seconds) % 60) : model.state)
                     .font(.system(size: 11, weight: .medium)).monospacedDigit().lineLimit(1)
                 Spacer(minLength: 0)
                 if model.recording {
-                    Button { model.stop() } label: { Image(systemName: "stop.fill").font(.system(size: 9)).frame(width: 24, height: 24).background(purple, in: Circle()) }.help("Finish dictation")
+                    Button { model.stop() } label: { Image(systemName: "stop.fill").font(.system(size: 9)).frame(width: 24, height: 24).background(LinearGradient(colors: [Color(red: 0.26, green: 0.61, blue: 1), jotBlue], startPoint: .topLeading, endPoint: .bottomTrailing), in: Circle()).overlay(Circle().strokeBorder(.white.opacity(0.22), lineWidth: 0.7)).shadow(color: jotBlue.opacity(0.45), radius: 7) }.help("Finish dictation")
                 } else if model.finishing { ProgressView().controlSize(.mini) }
                 else {
                     if !model.transcript.isEmpty { Button { TextInsertion.copy(model.transcript) } label: { Image(systemName: "doc.on.doc") }.help("Copy transcript") }
@@ -287,12 +287,12 @@ struct RecordingView: View {
                     .font(.system(size: 11)).foregroundStyle(.white.opacity(0.8))
             } else {
                 ScrollView(.vertical) {
-                    Text(model.transcript).font(.system(size: 11)).foregroundStyle(.white.opacity(0.8))
+                    (Text(model.transcript).foregroundColor(.white.opacity(0.94)) + Text(model.recording ? " ▏" : "").foregroundColor(jotBlue)).font(.system(size: 11))
                         .fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)
-                }.defaultScrollAnchor(.bottom).frame(maxHeight: 52)
+                }.defaultScrollAnchor(.bottom).frame(height: OverlayLayout.textHeight(model.transcript))
             }
-        }.padding(12).frame(width: 228, height: model.transcript.isEmpty ? 72 : 108).foregroundStyle(.white)
-            .background(Color(white: 0.14).opacity(0.97), in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.white.opacity(0.1))).padding(4)
+        }.padding(12).frame(width: 228, height: OverlayLayout.height(model.transcript) - 8).foregroundStyle(.white)
+            .background(LinearGradient(colors: [Color(red: 0.08, green: 0.12, blue: 0.18), Color(red: 0.045, green: 0.075, blue: 0.12)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(jotBlue.opacity(0.22))).padding(4)
     }
 }

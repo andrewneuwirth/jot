@@ -65,7 +65,7 @@ import SwiftUI
             p.contentView = host; pill = p
         }
         if let screen = NSScreen.screens.first(where: { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) }) ?? NSScreen.main {
-            let height: CGFloat = model.transcript.isEmpty ? 80 : 116
+            let height = OverlayLayout.height(model.transcript)
             pill?.setFrame(NSRect(x: screen.visibleFrame.maxX - 236 - 16, y: screen.visibleFrame.minY + 16, width: 236, height: height), display: true)
         }
         pill?.orderFrontRegardless()

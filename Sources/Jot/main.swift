@@ -13,16 +13,16 @@ import JotCore
         let args = CommandLine.arguments
         if args.contains("--prepare-model") || args.contains("--benchmark") {
             let engine = SpeechEngine()
-            let mode: SpeechMode = args.contains("--320") ? .balanced : .fast
+            let mode: SpeechMode = args.contains("--ultra") ? .ultra : (args.contains("--320") ? .balanced : .fast)
             do {
                 if let i = args.firstIndex(of: "--benchmark"), args.count > i + 1 {
                     let reference: String? = args.firstIndex(of: "--reference").flatMap { args.count > $0 + 1 ? args[$0 + 1] : nil }
                     let path = URL(fileURLWithPath: args[i + 1])
                     let result = try await engine.transcribeFile(path, mode: mode, source: path.lastPathComponent, reference: reference)
-                    let library = Library(); library.add(result)
+                    if !args.contains("--no-save") { let library = Library(); library.add(result) }
                     let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
                     print(String(data: try encoder.encode(result), encoding: .utf8)!)
-                } else { try await engine.load(mode); print("Jot model ready: \(mode.modelName)") }
+                } else { try await engine.load(mode); print("Jot model ready: \(mode.modelName)"); print("Preview: \(await engine.previewStatus)") }
             } catch { fputs("Jot: \(error.localizedDescription)\n", stderr); exit(1) }
             return
         }

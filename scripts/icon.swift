@@ -8,7 +8,7 @@ for size in [16,32,128,256,512] {
         image.lockFocus()
         let rect = NSRect(x: CGFloat(pixels)*0.055, y: CGFloat(pixels)*0.055, width: CGFloat(pixels)*0.89, height: CGFloat(pixels)*0.89)
         let shape = NSBezierPath(roundedRect: rect, xRadius: CGFloat(pixels)*0.21, yRadius: CGFloat(pixels)*0.21)
-        NSGradient(starting: NSColor(srgbRed:0.63,green:0.48,blue:0.91,alpha:1), ending: NSColor(srgbRed:0.36,green:0.24,blue:0.66,alpha:1))!.draw(in: shape, angle: -60)
+        NSGradient(starting: NSColor(srgbRed:0.26,green:0.65,blue:1,alpha:1), ending: NSColor(srgbRed:0.10,green:0.35,blue:0.82,alpha:1))!.draw(in: shape, angle: -60)
         NSColor.white.setFill()
         for (i, h) in [0.17,0.32,0.49,0.32,0.17].enumerated() {
             let width = CGFloat(pixels)*0.065, height = CGFloat(pixels)*h

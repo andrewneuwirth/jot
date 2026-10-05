@@ -44,8 +44,14 @@ import ServiceManagement
     @Published var keepAudio = UserDefaults.standard.object(forKey: "keepAudio") as? Bool ?? false
     @Published var microphoneID = UInt32(UserDefaults.standard.integer(forKey: "microphoneID"))
     @Published var modelLoadMS: Double = 0
+    @Published var previewStatus = "Apple on-device speech"
     var overlayChanged: (() -> Void)?
     public init() {
+        if !UserDefaults.standard.bool(forKey: "ultraMigration") {
+            mode = .ultra
+            UserDefaults.standard.set("ultra", forKey: "mode")
+            UserDefaults.standard.set(true, forKey: "ultraMigration")
+        }
         hotkeys.toggle = { [weak self] in self?.toggle() }
         hotkeys.cancel = { [weak self] in self?.cancel() }
         hotkeys.isRecording = { [weak self] in self?.recording == true }
@@ -71,7 +77,7 @@ import ServiceManagement
         guard !recording, !finishing, !busy else { return }
         ready = false; busy = true; state = "Preparing \(mode.title)…"; persistPreferences()
         let start = Date()
-        do { try await speech.load(mode); modelLoadMS = Date().timeIntervalSince(start) * 1000; ready = true; state = "Ready" }
+        do { try await speech.load(mode); modelLoadMS = Date().timeIntervalSince(start) * 1000; previewStatus = await speech.previewStatus; ready = true; state = "Ready" }
         catch { state = "Model unavailable"; notice = error.localizedDescription }
         busy = false
     }
@@ -101,7 +107,7 @@ import ServiceManagement
                     guard let self else { return }; self.seconds = Date().timeIntervalSince(self.started)
                 } }
                 for await buffer in stream { try await speech.process(buffer) }
-                let raw = try await speech.finish()
+                let raw = try await speech.finish(recordingURL: currentAudioURL)
                 let final = TranscriptTools.applyVocabulary(raw, rules: library.vocabulary)
                 complete(final)
             } catch {
