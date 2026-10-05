@@ -272,7 +272,7 @@ struct RecordingView: View {
                         .frame(width: 3, height: CGFloat(4 + model.level * Float(7 + i * 3)))
                 } }.frame(width: 34, height: 22)
                 Text(model.recording ? String(format: "%d:%02d", Int(model.seconds) / 60, Int(model.seconds) % 60) : model.state)
-                    .font(.system(size: 11, weight: .medium, design: .monospaced)).lineLimit(1)
+                    .font(.system(size: 11, weight: .medium)).monospacedDigit().lineLimit(1)
                 Spacer(minLength: 0)
                 if model.recording {
                     Button { model.stop() } label: { Image(systemName: "stop.fill").font(.system(size: 9)).frame(width: 24, height: 24).background(purple, in: Circle()) }.help("Finish dictation")
@@ -282,10 +282,16 @@ struct RecordingView: View {
                     Button { model.showOverlay = false; model.overlayChanged?() } label: { Image(systemName: "xmark") }.help("Dismiss")
                 }
             }.buttonStyle(.plain)
-            Text(model.transcript.isEmpty ? (model.notice.isEmpty ? "Listening…" : model.notice) : model.transcript)
-                .font(.system(size: 11)).foregroundStyle(.white.opacity(0.8)).lineLimit(1).truncationMode(.head)
-                .help(model.notice.isEmpty ? model.transcript : model.notice)
-        }.padding(12).frame(width: 228, height: 72).foregroundStyle(.white)
+            if model.transcript.isEmpty {
+                Text(model.recording ? "Listening" : (model.finishing ? "Finishing" : ""))
+                    .font(.system(size: 11)).foregroundStyle(.white.opacity(0.8))
+            } else {
+                ScrollView(.vertical) {
+                    Text(model.transcript).font(.system(size: 11)).foregroundStyle(.white.opacity(0.8))
+                        .fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)
+                }.defaultScrollAnchor(.bottom).frame(maxHeight: 52)
+            }
+        }.padding(12).frame(width: 228, height: model.transcript.isEmpty ? 72 : 108).foregroundStyle(.white)
             .background(Color(white: 0.14).opacity(0.97), in: RoundedRectangle(cornerRadius: 16))
             .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.white.opacity(0.1))).padding(4)
     }

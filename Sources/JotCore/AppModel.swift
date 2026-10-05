@@ -137,8 +137,8 @@ import ServiceManagement
         var status = "Saved to history"
         if cancelled {
             if let id = noteTarget, let i = library.notes.firstIndex(where: { $0.id == id }), !noteInsertionPaused, library.notes[i].body == noteExpected { library.notes[i].body = noteOriginal }
-            status = "Cancelled · recovered in history"; notice = "Cancelled. Recording is available in History."
-        } else if text.isEmpty { status = "No speech detected · retry available"; notice = "No words detected. Your recording is available in History." }
+            status = "Cancelled · recovered in history"; notice = ""
+        } else if text.isEmpty { status = "No speech detected · retry available"; notice = "" }
         else if let id = noteTarget, let i = library.notes.firstIndex(where: { $0.id == id }) {
             if !noteInsertionPaused, library.notes[i].body == noteExpected {
                 library.notes[i].body = noteOriginal + (noteOriginal.isEmpty ? "" : "\n") + text
@@ -153,7 +153,15 @@ import ServiceManagement
         library.add(Dictation(text: text, audioFile: recover ? audio : nil, duration: seconds, finishMS: ms, model: mode.modelName, destination: noteTarget == nil ? insertion.destination : "Jot note", status: status))
         if !recover, let path = currentAudioURL { try? FileManager.default.removeItem(at: path) }
         transcript = text
-        if notice.isEmpty { Task { try? await Task.sleep(nanoseconds: 700_000_000); if !recording && !finishing { showOverlay = false; overlayChanged?() } } }
+        if text.isEmpty || cancelled {
+            showOverlay = false
+        } else if notice.isEmpty {
+            let completedSession = session
+            Task {
+                try? await Task.sleep(nanoseconds: 700_000_000)
+                if session == completedSession, !recording, !finishing { showOverlay = false; overlayChanged?() }
+            }
+        }
         overlayChanged?()
     }
     func newNote() { section = "Notes"; selection = library.addNote() }
