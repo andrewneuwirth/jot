@@ -265,18 +265,28 @@ enum Microphones {
 struct RecordingView: View {
     @ObservedObject var model: AppModel
     var body: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 16) {
-                HStack(alignment: .center, spacing: 3) { ForEach(0..<15) { i in RoundedRectangle(cornerRadius: 2).fill(Color(red: 0.7, green: 0.55, blue: 1)).frame(width: 3, height: CGFloat(5 + model.level * Float(10 + (i * 13 % 24)))) } }.frame(width: 90, height: 38)
-                VStack(alignment: .leading, spacing: 4) { Text(model.state).font(.system(size: 13, weight: .semibold)); Text(String(format: "%d:%02d", Int(model.seconds) / 60, Int(model.seconds) % 60)).font(.system(size: 12, design: .monospaced)).foregroundStyle(.white.opacity(0.55)) }
-                Spacer()
-                if model.recording { Button { model.stop() } label: { Image(systemName: "stop.fill").frame(width: 35, height: 35).background(purple, in: Circle()) }.buttonStyle(.plain).help("Finish dictation") }
-                else if model.finishing { ProgressView().controlSize(.small) }
-                else { Button { model.showOverlay = false; model.overlayChanged?() } label: { Image(systemName: "xmark") }.buttonStyle(.plain) }
-            }
-            if !model.transcript.isEmpty { Text(model.transcript).font(.system(size: 13)).lineLimit(3).frame(maxWidth: .infinity, alignment: .leading).foregroundStyle(.white.opacity(0.9)) }
-            if !model.notice.isEmpty { Text(model.notice).font(.caption).foregroundStyle(.white.opacity(0.7)).lineLimit(3) }
-            if !model.recording && !model.finishing && !model.transcript.isEmpty { Button("Copy transcript") { TextInsertion.copy(model.transcript) }.buttonStyle(.bordered) }
-        }.padding(18).frame(width: 390).foregroundStyle(.white).background(Color(white: 0.14).opacity(0.97), in: RoundedRectangle(cornerRadius: 24)).overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(.white.opacity(0.09))).padding(10)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                HStack(spacing: 2) { ForEach(0..<7) { i in
+                    RoundedRectangle(cornerRadius: 2).fill(purple)
+                        .frame(width: 3, height: CGFloat(4 + model.level * Float(7 + i * 3)))
+                } }.frame(width: 34, height: 22)
+                Text(model.recording ? String(format: "%d:%02d", Int(model.seconds) / 60, Int(model.seconds) % 60) : model.state)
+                    .font(.system(size: 11, weight: .medium, design: .monospaced)).lineLimit(1)
+                Spacer(minLength: 0)
+                if model.recording {
+                    Button { model.stop() } label: { Image(systemName: "stop.fill").font(.system(size: 9)).frame(width: 24, height: 24).background(purple, in: Circle()) }.help("Finish dictation")
+                } else if model.finishing { ProgressView().controlSize(.mini) }
+                else {
+                    if !model.transcript.isEmpty { Button { TextInsertion.copy(model.transcript) } label: { Image(systemName: "doc.on.doc") }.help("Copy transcript") }
+                    Button { model.showOverlay = false; model.overlayChanged?() } label: { Image(systemName: "xmark") }.help("Dismiss")
+                }
+            }.buttonStyle(.plain)
+            Text(model.transcript.isEmpty ? (model.notice.isEmpty ? "Listening…" : model.notice) : model.transcript)
+                .font(.system(size: 11)).foregroundStyle(.white.opacity(0.8)).lineLimit(1).truncationMode(.head)
+                .help(model.notice.isEmpty ? model.transcript : model.notice)
+        }.padding(12).frame(width: 228, height: 72).foregroundStyle(.white)
+            .background(Color(white: 0.14).opacity(0.97), in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.white.opacity(0.1))).padding(4)
     }
 }

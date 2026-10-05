@@ -58,4 +58,11 @@ final class JotTests: XCTestCase {
         XCTAssertEqual(reopened.history.first?.audioFile, "interrupted.caf")
     }
 
+    @MainActor func testPlaceholderAndWebEditorsUseFinalPaste() {
+        XCTAssertTrue(TextInsertion.requiresFinalPaste(bundleID: nil, value: "Do anything\n", placeholder: "Do anything"))
+        XCTAssertTrue(TextInsertion.requiresFinalPaste(bundleID: "com.openai.codex", value: "", placeholder: nil))
+        XCTAssertTrue(TextInsertion.requiresFinalPaste(bundleID: "com.google.Chrome", value: "Existing draft", placeholder: nil))
+        XCTAssertFalse(TextInsertion.requiresFinalPaste(bundleID: "com.apple.TextEdit", value: "Existing draft", placeholder: nil))
+    }
+
 }

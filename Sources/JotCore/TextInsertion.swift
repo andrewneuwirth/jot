@@ -40,6 +40,11 @@ import ApplicationServices
         fallbackElement = field
         expected = value(field, kAXValueAttribute) as? String ?? ""
         originalSelection = range(field)
+        // Web editors can expose placeholder DOM text as AXValue and normalize
+        // the caret after a write. Never rebuild their entire value from AX.
+        let placeholder = value(field, kAXPlaceholderValueAttribute) as? String
+        guard !Self.requiresFinalPaste(bundleID: app.bundleIdentifier, value: expected, placeholder: placeholder),
+              !isWebField(field) else { return }
         var settable = DarwinBoolean(false)
         guard AXUIElementIsAttributeSettable(field, kAXValueAttribute as CFString, &settable) == .success, settable.boolValue,
               let text = value(field, kAXValueAttribute) as? String, let selected = range(field),
@@ -48,6 +53,19 @@ import ApplicationServices
         selectedOriginal = ns.substring(with: NSRange(location: selected.location, length: selected.length))
         before = ns.substring(to: selected.location); after = ns.substring(from: selected.location + selected.length)
         expected = text; caret = selected.location; element = field; available = true
+    }
+    static func requiresFinalPaste(bundleID: String?, value: String, placeholder: String?) -> Bool {
+        if let placeholder, !placeholder.isEmpty, value.trimmingCharacters(in: .whitespacesAndNewlines) == placeholder.trimmingCharacters(in: .whitespacesAndNewlines) { return true }
+        return ["com.openai.codex", "com.openai.chat", "com.anthropic.claudefordesktop", "com.google.Chrome", "com.apple.Safari", "com.microsoft.edgemac", "org.mozilla.firefox"].contains(bundleID ?? "")
+    }
+    private func isWebField(_ field: AXUIElement) -> Bool {
+        var current = field
+        for _ in 0..<16 {
+            if value(current, kAXRoleAttribute) as? String == "AXWebArea" { return true }
+            guard let parent = value(current, kAXParentAttribute), CFGetTypeID(parent) == AXUIElementGetTypeID() else { break }
+            current = parent as! AXUIElement
+        }
+        return false
     }
     private func unchanged(_ field: AXUIElement) -> Bool {
         guard NSWorkspace.shared.frontmostApplication?.processIdentifier == pid,

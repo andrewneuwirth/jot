@@ -59,13 +59,13 @@ import SwiftUI
     private func updatePill() {
         guard model.showOverlay else { pill?.orderOut(nil); return }
         if pill == nil {
-            let p = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 410, height: 220), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+            let p = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 236, height: 80), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
             p.isFloatingPanel = true; p.level = .floating; p.hidesOnDeactivate = false; p.isOpaque = false; p.backgroundColor = .clear; p.hasShadow = true; p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             let host = NSHostingView(rootView: RecordingView(model: model)); host.sizingOptions = []
             p.contentView = host; pill = p
         }
         if let screen = NSScreen.screens.first(where: { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) }) ?? NSScreen.main {
-            pill?.setFrameOrigin(NSPoint(x: screen.visibleFrame.midX - 205, y: screen.visibleFrame.minY + 18))
+            pill?.setFrameOrigin(NSPoint(x: screen.visibleFrame.maxX - 236 - 16, y: screen.visibleFrame.minY + 16))
         }
         pill?.orderFrontRegardless()
     }
