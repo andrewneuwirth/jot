@@ -37,7 +37,7 @@ struct MainView: View {
                 if let status = entry.cleanupStatus { Text("\(status) · \(Int(entry.cleanupMS ?? 0)) ms cleanup").font(.caption).foregroundStyle(.secondary) }
                 Text(entry.text.isEmpty ? "Recording to recover" : entry.text).lineLimit(2).font(.body.weight(.medium))
                                         Text(entry.date.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
-                                    }.frame(maxWidth: .infinity, alignment: .leading).padding(12).background(model.selection == entry.id ? jotBlue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 10))
+                                    }.frame(maxWidth: .infinity, alignment: .leading).padding(12).background(model.selection == entry.id ? jotBlue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 10)).contentShape(RoundedRectangle(cornerRadius: 10))
                                 }.buttonStyle(.plain)
                             }
                         } else {
@@ -47,7 +47,7 @@ struct MainView: View {
                                         HStack { Text(note.title.isEmpty ? "Untitled note" : note.title).font(.body.weight(.semibold)).lineLimit(1); if note.pinned { Image(systemName: "pin.fill").font(.caption).foregroundStyle(jotBlue) } }
                                         Text(note.body.isEmpty ? "A little room for a thought." : note.body).font(.callout).foregroundStyle(.secondary).lineLimit(2)
                                         Text(note.updated.formatted(date: .abbreviated, time: .omitted)).font(.caption).foregroundStyle(.tertiary)
-                                    }.frame(maxWidth: .infinity, alignment: .leading).padding(12).background(model.selection == note.id ? jotBlue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 10))
+                                    }.frame(maxWidth: .infinity, alignment: .leading).padding(12).background(model.selection == note.id ? jotBlue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 10)).contentShape(RoundedRectangle(cornerRadius: 10))
                                 }.buttonStyle(.plain)
                             }
                         }
@@ -85,7 +85,7 @@ struct MainView: View {
             HStack { Text("Folders").foregroundStyle(.secondary); Spacer(); Button { addingFolder = true } label: { Image(systemName: "plus") }.buttonStyle(.plain) }.font(.caption).padding(.horizontal, 14).padding(.top, 24).padding(.bottom, 5)
             ForEach(library.folders, id: \.self) { nav($0, "folder") }
             Spacer()
-            Button { model.showSettings = true } label: { Label("Settings", systemImage: "gearshape").frame(maxWidth: .infinity, alignment: .leading).padding(11).background(model.showSettings ? jotBlue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: MT.Radius.row)) }.buttonStyle(.plain)
+            Button { model.showSettings = true } label: { Label("Settings", systemImage: "gearshape").frame(maxWidth: .infinity, alignment: .leading).padding(11).background(model.showSettings ? jotBlue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: MT.Radius.row)).contentShape(RoundedRectangle(cornerRadius: MT.Radius.row)) }.buttonStyle(.plain)
             HStack { Circle().fill(model.recording || model.classes.isActive ? Color.mtBad : (model.ready ? Color.mtGood : Color.mtWarn)).frame(width: 8, height: 8); Text(model.classes.isActive ? "Class · " + formatClock(model.classes.elapsed) : model.state).font(.caption.monospacedDigit()).lineLimit(2) }.padding(12)
         }.padding(10)
         .glassEffect(.regular, in: .rect(cornerRadius: MT.Radius.section))
@@ -93,7 +93,7 @@ struct MainView: View {
     }
     func nav(_ title: String, _ icon: String) -> some View {
         Button { model.section = title; model.showSettings = false; model.search = ""; model.selection = title == "Dictation History" ? library.history.first?.id : library.notes.first(where: { title == "Notes" || (title == "Pinned" && $0.pinned) || $0.folder == title })?.id } label: {
-            Label(title, systemImage: icon).frame(maxWidth: .infinity, alignment: .leading).padding(11).background(!model.showSettings && model.section == title ? jotBlue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: MT.Radius.row))
+            Label(title, systemImage: icon).frame(maxWidth: .infinity, alignment: .leading).padding(11).background(!model.showSettings && model.section == title ? jotBlue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: MT.Radius.row)).contentShape(RoundedRectangle(cornerRadius: MT.Radius.row))
         }.buttonStyle(.plain)
     }
     @ViewBuilder var detail: some View {
@@ -425,7 +425,7 @@ struct ClassView: View {
                                 Text(s.title).font(.body.weight(.semibold)).lineLimit(1)
                                 Text("\(formatClock(s.id == classes.active?.id ? classes.elapsed : s.seconds)) · \(s.status)").font(.caption.monospacedDigit()).foregroundStyle(s.status == "Recording" ? .red : .secondary)
                             }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
-                            .background(shown?.id == s.id ? jotBlue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 10))
+                            .background(shown?.id == s.id ? jotBlue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 10)).contentShape(RoundedRectangle(cornerRadius: 10))
                         }.buttonStyle(.plain)
                     }
                 }.padding(.horizontal, 8) }
