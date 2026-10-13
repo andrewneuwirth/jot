@@ -2,6 +2,7 @@ import AppKit
 import Carbon
 
 final class GlobalHotkeys {
+    var smartPaste: (() -> Void)?
     var toggle: (() -> Void)?
     var cancel: (() -> Void)?
     var isRecording: (() -> Bool)?
@@ -9,6 +10,7 @@ final class GlobalHotkeys {
     private var source: CFRunLoopSource?
     private var globeDown = false
     private var swallowedJ = false
+    private var swallowedV = false
     @discardableResult func start() -> Bool {
         guard tap == nil else { return true }
         let mask = [CGEventType.flagsChanged, .keyDown, .keyUp].reduce(CGEventMask(0)) { $0 | (1 << $1.rawValue) }
@@ -24,7 +26,7 @@ final class GlobalHotkeys {
     }
     private func handle(_ type: CGEventType, _ event: CGEvent) -> Unmanaged<CGEvent>? {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            globeDown = false; swallowedJ = false
+            globeDown = false; swallowedJ = false; swallowedV = false
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             return Unmanaged.passUnretained(event)
         }
@@ -34,6 +36,17 @@ final class GlobalHotkeys {
             let modifiers = event.flags.intersection([.maskControl, .maskCommand, .maskAlternate, .maskShift])
             if down, !globeDown, modifiers.isEmpty { globeDown = true; DispatchQueue.main.async { [weak self] in self?.toggle?() }; return nil }
             if !down, globeDown { globeDown = false; return nil }
+        }
+        if code == 9 {
+            if type == .keyUp, swallowedV {
+                swallowedV = false
+                DispatchQueue.main.async { [weak self] in self?.smartPaste?() }
+                return nil
+            }
+            if type == .keyDown, event.flags.intersection([.maskControl, .maskCommand, .maskAlternate, .maskShift]) == [.maskControl, .maskCommand] {
+                swallowedV = true
+                return nil
+            }
         }
         if code == 38 {
             if type == .keyUp, swallowedJ { swallowedJ = false; return nil }

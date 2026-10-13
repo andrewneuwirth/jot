@@ -6,7 +6,7 @@ A local macOS dictation and notes app. Native SwiftUI/AppKit, NVIDIA Parakeet Re
 
 - Globe: tap to start, tap again to finish. Escape cancels.
 - Rear/bottom mouse side button: Ctrl–Command–J, toggles dictation.
-- Front/top mouse side button: Command–V, paste.
+- Front/top mouse side button: Control–Command–V: delete selected editable text, otherwise paste. Ordinary keyboard Command–V is unchanged.
 - Notes: create, edit, pin, organize in folders, search, export. Formatting toolbar inserts Markdown.
 - Dictation History: recover, copy, save as a note, retry/play retained recordings.
 - Settings: actual selected model/mode, microphone, permissions, launch at login, vocabulary, local storage and real benchmarks.

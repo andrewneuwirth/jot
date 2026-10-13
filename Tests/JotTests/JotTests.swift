@@ -103,11 +103,22 @@ final class JotTests: XCTestCase {
         XCTAssertEqual(t.update(start: 0, end: 2, text: "", isFinal: false), "I think so.")
         XCTAssertEqual(t.update(start: 3, end: 5, text: "I think so.", isFinal: true), "I think so. I think so.")
     }
-    func testPreviewRevokesOnlyTheAffectedProvisionalRange() {
+    func testPreviewRetainsRetractedProvisionalTextUntilRecordingEnds() {
         var t = PreviewTranscript()
         _ = t.update(start: 0, end: 2, text: "Keep this.", isFinal: true)
         _ = t.update(start: 3, end: 4, text: "Noise", isFinal: false)
-        XCTAssertEqual(t.update(start: 3, end: 4, text: "", isFinal: false), "Keep this.")
+        XCTAssertEqual(t.update(start: 3, end: 4, text: "", isFinal: false), "Keep this. Noise")
+    }
+
+    func testPreviewRetainsSentenceAfterPauseRetractionAndOverlap() {
+        var t = PreviewTranscript()
+        let first = "so this is me testing"
+        XCTAssertEqual(t.update(start: 0, end: 3, text: first, isFinal: false), first)
+        XCTAssertEqual(t.update(start: 0, end: 3, text: "", isFinal: false), first)
+        XCTAssertEqual(t.update(start: 0, end: 3, text: "so this", isFinal: false), first)
+        XCTAssertEqual(t.update(start: 2.9, end: 5, text: "and these are my next words", isFinal: false), first + " and these are my next words")
+        XCTAssertEqual(t.update(start: 2.9, end: 5, text: "", isFinal: true), first + " and these are my next words")
+        XCTAssertEqual(PreviewTranscript().text, "")
     }
 
 }

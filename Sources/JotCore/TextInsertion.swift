@@ -14,6 +14,7 @@ import ApplicationServices
     private var selectedOriginal = ""
     private var ownsRange = false
     private var caret = 0
+    private var terminalDestination = false
     public private(set) var inserted = ""
     public private(set) var paused = false
     public private(set) var destination = ""
@@ -27,7 +28,7 @@ import ApplicationServices
         var range = CFRange(); guard AXValueGetValue(raw as! AXValue, .cfRange, &range) else { return nil }; return range
     }
     public func capture() {
-        element = nil; fallbackElement = nil; originalSelection = nil; inserted = ""; ownsRange = false; paused = false; available = false
+        element = nil; fallbackElement = nil; originalSelection = nil; inserted = ""; ownsRange = false; paused = false; available = false; terminalDestination = false
         guard let app = NSWorkspace.shared.frontmostApplication else { return }
         pid = app.processIdentifier; destination = app.localizedName ?? "App"
         guard pid != getpid(), AXIsProcessTrusted() else { return }
@@ -37,13 +38,16 @@ import ApplicationServices
         let field = raw as! AXUIElement
         AXUIElementSetMessagingTimeout(field, 0.2)
         if let subrole = value(field, kAXSubroleAttribute) as? String, subrole == kAXSecureTextFieldSubrole { return }
+        let role = value(field, kAXRoleAttribute) as? String ?? ""
+        terminalDestination = Self.isTerminalDestination(bundleID: app.bundleIdentifier, role: role)
         fallbackElement = field
         expected = value(field, kAXValueAttribute) as? String ?? ""
         originalSelection = range(field)
         // Web editors can expose placeholder DOM text as AXValue and normalize
         // the caret after a write. Never rebuild their entire value from AX.
         let placeholder = value(field, kAXPlaceholderValueAttribute) as? String
-        guard !Self.requiresFinalPaste(bundleID: app.bundleIdentifier, value: expected, placeholder: placeholder),
+        guard !terminalDestination,
+              !Self.requiresFinalPaste(bundleID: app.bundleIdentifier, value: expected, placeholder: placeholder),
               !isWebField(field) else { return }
         var settable = DarwinBoolean(false)
         guard AXUIElementIsAttributeSettable(field, kAXValueAttribute as CFString, &settable) == .success, settable.boolValue,
@@ -53,6 +57,38 @@ import ApplicationServices
         selectedOriginal = ns.substring(with: NSRange(location: selected.location, length: selected.length))
         before = ns.substring(to: selected.location); after = ns.substring(from: selected.location + selected.length)
         expected = text; caret = selected.location; element = field; available = true
+    }
+    /// Select the destination at stop, before final transcription/cleanup.
+    /// A subsequent focus change still cancels automatic insertion.
+    public func captureFinishDestination() {
+        guard let app = NSWorkspace.shared.frontmostApplication else { invalidateDestination(); return }
+        let root = AXUIElementCreateApplication(app.processIdentifier)
+        AXUIElementSetMessagingTimeout(root, 0.2)
+        guard let raw = value(root, kAXFocusedUIElementAttribute), CFGetTypeID(raw) == AXUIElementGetTypeID() else { invalidateDestination(); return }
+        let field = raw as! AXUIElement
+        AXUIElementSetMessagingTimeout(field, 0.2)
+        if app.processIdentifier == pid, let original = fallbackElement, CFEqual(field, original) {
+            // Preserve ownership of provisional text in the original field.
+            return
+        }
+        let role = value(field, kAXRoleAttribute) as? String ?? ""
+        let secure = value(field, kAXSubroleAttribute) as? String == kAXSecureTextFieldSubrole
+        var settable = DarwinBoolean(false)
+        AXUIElementIsAttributeSettable(field, kAXValueAttribute as CFString, &settable)
+        let editable = settable.boolValue || value(field, "AXEditable") as? Bool == true || range(field) != nil
+        guard Self.canRetarget(role: role, secure: secure, editable: editable, bundleID: app.bundleIdentifier), app.processIdentifier != getpid() else { invalidateDestination(); return }
+        capture()
+        // Switched destinations receive final text only; never late preview updates.
+        element = nil; available = false
+    }
+    static func canRetarget(role: String, secure: Bool, editable: Bool, bundleID: String? = nil) -> Bool {
+        !secure && ((editable && [kAXTextFieldRole, kAXTextAreaRole, kAXComboBoxRole].contains(role)) || isTerminalDestination(bundleID: bundleID, role: role))
+    }
+    static func isTerminalDestination(bundleID: String?, role: String) -> Bool {
+        role == kAXTextAreaRole && ["com.apple.Terminal", "com.googlecode.iterm2", "com.mitchellh.ghostty", "dev.warp.Warp-Stable"].contains(bundleID ?? "")
+    }
+    private func invalidateDestination() {
+        element = nil; fallbackElement = nil; available = false; paused = true
     }
     static func requiresFinalPaste(bundleID: String?, value: String, placeholder: String?) -> Bool {
         if let placeholder, !placeholder.isEmpty, value.trimmingCharacters(in: .whitespacesAndNewlines) == placeholder.trimmingCharacters(in: .whitespacesAndNewlines) { return true }
@@ -92,9 +128,11 @@ import ApplicationServices
     public func pasteFinal(_ text: String) -> Bool {
         guard inserted.isEmpty, !text.isEmpty, let field = fallbackElement,
               NSWorkspace.shared.frontmostApplication?.processIdentifier == pid,
-              let focused = value(AXUIElementCreateApplication(pid), kAXFocusedUIElementAttribute), CFEqual(focused, field),
-              (value(field, kAXValueAttribute) as? String ?? "") == expected else { return false }
-        if let originalSelection, let now = range(field),
+              let focused = value(AXUIElementCreateApplication(pid), kAXFocusedUIElementAttribute), CFEqual(focused, field) else { return false }
+        // A terminal's AX value is its changing screen buffer, not an editable
+        // command line. Keep focus ownership, but do not compare the buffer.
+        if !terminalDestination && (value(field, kAXValueAttribute) as? String ?? "") != expected { return false }
+        if !terminalDestination, let originalSelection, let now = range(field),
            (now.location != originalSelection.location || now.length != originalSelection.length) { return false }
         Self.copy(text)
         for down in [true, false] {

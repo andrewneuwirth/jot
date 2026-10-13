@@ -1,0 +1,52 @@
+[
+  [
+    "heldout_name",
+    "Email Jordan, sorry Morgan, the updated invoice.",
+    "Email Morgan the updated invoice."
+  ],
+  [
+    "heldout_date",
+    "The deadline is June tenth, no, June twelfth.",
+    "The deadline is June twelfth."
+  ],
+  [
+    "heldout_negation",
+    "I can attend, sorry, I cannot attend the meeting.",
+    "I cannot attend the meeting."
+  ],
+  [
+    "heldout_comparison",
+    "It looks like rain, so bring a jacket.",
+    "It looks like rain, so bring a jacket."
+  ],
+  [
+    "heldout_hesitation",
+    "Uh I think we should maybe wait until next week.",
+    "I think we should maybe wait until next week."
+  ],
+  [
+    "heldout_alternatives",
+    "We could go Tuesday or Wednesday.",
+    "We could go Tuesday or Wednesday."
+  ],
+  [
+    "heldout_cancel",
+    "Buy two tickets, actually never mind, do not buy any tickets.",
+    "Do not buy any tickets."
+  ],
+  [
+    "heldout_quoted",
+    "Type the words \"um, like, you know\" exactly as written.",
+    "Type the words \"um, like, you know\" exactly as written."
+  ],
+  [
+    "heldout_number",
+    "The code is zero zero seven, not seventy.",
+    "The code is zero zero seven, not seventy."
+  ],
+  [
+    "heldout_question",
+    "Can you explain why the sky is blue?",
+    "Can you explain why the sky is blue?"
+  ]
+]

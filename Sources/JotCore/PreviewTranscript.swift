@@ -20,14 +20,23 @@ struct PreviewTranscript {
     }
     mutating func update(start: Double, end: Double, text: String, isFinal: Bool) -> String {
         guard start.isFinite, end.isFinite, end >= start else { return self.text }
-        let sameOrOverlapping: (Segment) -> Bool = {
-            abs($0.start - start) < 0.0001 || ($0.start < end - 0.0001 && start < $0.end - 0.0001)
-        }
-        // A late provisional update must not undo already committed speech.
-        if !isFinal, segments.contains(where: { $0.final && sameOrOverlapping($0) }) { return self.text }
-        segments.removeAll(where: sameOrOverlapping)
         let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !cleaned.isEmpty { segments.append(Segment(start: start, end: end, text: cleaned, final: isFinal)) }
+        // Apple's empty volatile result retracts a hypothesis. For a recording
+        // preview, keep what the user has already seen until final transcription.
+        guard !cleaned.isEmpty else { return self.text }
+        if let index = segments.firstIndex(where: { abs($0.start - start) < 0.0001 }) {
+            let previous = segments[index]
+            if previous.final { return self.text }
+            // Shorter revisions must not erase a sentence during a pause.
+            let oldWords = previous.text.split(whereSeparator: \.isWhitespace).count
+            let newWords = cleaned.split(whereSeparator: \.isWhitespace).count
+            guard newWords >= oldWords else { return self.text }
+            segments[index] = Segment(start: start, end: max(end, previous.end), text: cleaned, final: isFinal)
+        } else {
+            // A new phrase can overlap the tail of the preceding audio range.
+            // Never remove the preceding phrase simply because ranges overlap.
+            segments.append(Segment(start: start, end: end, text: cleaned, final: isFinal))
+        }
         segments.sort { $0.start < $1.start }
         return self.text
     }

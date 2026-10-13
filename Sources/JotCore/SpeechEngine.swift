@@ -117,8 +117,9 @@ public final class Recorder {
     public var onLevel: ((Float) -> Void)?
     public var onError: ((String) -> Void)?
     public init() {}
-    public func start(deviceID: AudioDeviceID? = nil) throws -> AsyncStream<AVAudioPCMBuffer> {
+    public func start(deviceID: AudioDeviceID? = nil, directory: URL = JotPaths.recordings) throws -> AsyncStream<AVAudioPCMBuffer> {
         try JotPaths.prepare()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let e = AVAudioEngine()
         let input = e.inputNode
         if var id = deviceID, let unit = input.audioUnit {
@@ -127,7 +128,7 @@ public final class Recorder {
         }
         let format = input.outputFormat(forBus: 0)
         guard format.sampleRate > 0, format.channelCount > 0 else { throw JotError.message("No microphone is available.") }
-        let path = JotPaths.recordings.appendingPathComponent("\(UUID().uuidString).caf")
+        let path = directory.appendingPathComponent("\(UUID().uuidString).caf")
         file = try AVAudioFile(forWriting: path, settings: format.settings)
         url = path
         let stream = AsyncStream<AVAudioPCMBuffer> { continuation = $0 }

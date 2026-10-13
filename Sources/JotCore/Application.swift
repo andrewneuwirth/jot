@@ -1,11 +1,17 @@
 import AppKit
 import SwiftUI
+import QuartzCore
 
 @MainActor public final class JotApplication: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let model = AppModel()
     private var window: NSWindow?
     private var pill: NSPanel?
     private var status: NSStatusItem?
+    private var bubbleVisible = UserDefaults.standard.object(forKey: "bubbleVisible") as? Bool ?? true
+    private var bubbleAnchor: CGPoint?
+    private var dragAnchor: CGPoint?
+    private var pillExpanded = false
+
     public func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         buildMenu()
@@ -13,12 +19,13 @@ import SwiftUI
         status?.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Jot")
         let menu = NSMenu()
         menu.addItem(withTitle: "Open Jot", action: #selector(openWindow), keyEquivalent: "")
+        menu.addItem(withTitle: "Show recording bubble", action: #selector(showBubble), keyEquivalent: "")
         menu.addItem(withTitle: "Start / finish dictation", action: #selector(toggle), keyEquivalent: "")
         menu.addItem(.separator()); menu.addItem(withTitle: "Settings…", action: #selector(settings), keyEquivalent: ",")
         menu.addItem(withTitle: "Quit Jot", action: #selector(quit), keyEquivalent: "q")
         for item in menu.items { item.target = self }; status?.menu = menu
         model.overlayChanged = { [weak self] in self?.updatePill() }
-        model.start(); openWindow()
+        model.start(); openWindow(); updatePill()
         Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             guard let self else { return }
             let diagnostic: [String: Any] = ["state": self.model.state, "window": self.window.map { NSStringFromRect($0.frame) } ?? "none", "visible": self.window?.isVisible ?? false, "settings": self.model.showSettings, "shortcuts": self.model.hotkeysReady, "recording": self.model.recording]
@@ -53,20 +60,52 @@ import SwiftUI
     @objc private func settings() { model.showSettings = true; openWindow() }
     @objc private func toggle() { model.toggle() }
     @objc private func quit() {
+        if model.classes.isActive { model.section = "Class"; model.showSettings = false; openWindow(); model.classes.notice = "Class recording is running. Stop it in the app before quitting."; return }
         if model.recording || model.finishing { model.notice = "Finish or cancel your recording before quitting."; updatePill(); return }
         NSApp.terminate(nil)
     }
+    @objc private func showBubble() { bubbleVisible = true; UserDefaults.standard.set(true, forKey: "bubbleVisible"); updatePill() }
     private func updatePill() {
-        guard model.showOverlay, model.recording || model.finishing else { pill?.orderOut(nil); return }
+        let expanded = model.recording || model.finishing
+        guard bubbleVisible || expanded else { pill?.orderOut(nil); return }
         if pill == nil {
-            let p = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 236, height: 80), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-            p.isFloatingPanel = true; p.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1); p.hidesOnDeactivate = false; p.isOpaque = false; p.backgroundColor = .clear; p.hasShadow = true; p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-            let host = NSHostingView(rootView: RecordingView(model: model)); host.sizingOptions = []
-            p.contentView = host; pill = p
+            let p = RecordingPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+            p.isFloatingPanel = true; p.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1); p.hidesOnDeactivate = false; p.isOpaque = false; p.backgroundColor = .clear; p.hasShadow = false; p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            let host = NSHostingView(rootView: RecordingBubble(model: model,
+                open: { [weak self] section in self?.model.section = section; self?.model.selection = section == "Dictation History" ? self?.model.library.history.first?.id : self?.model.library.notes.first?.id; self?.model.showSettings = false; self?.openWindow() },
+                settings: { [weak self] in self?.settings() },
+                hide: { [weak self] in self?.bubbleVisible = false; UserDefaults.standard.set(false, forKey: "bubbleVisible"); self?.updatePill() },
+                drag: { [weak self] translation, ended in
+                    guard let self, let anchor = self.bubbleAnchor else { return }
+                    if self.dragAnchor == nil { self.dragAnchor = anchor }
+                    if let origin = self.dragAnchor { self.bubbleAnchor = CGPoint(x: origin.x + translation.width, y: origin.y - translation.height) }
+                    self.updatePill()
+                    if ended {
+                        self.dragAnchor = nil
+                        if let point = self.bubbleAnchor { UserDefaults.standard.set(NSStringFromPoint(point), forKey: "bubbleAnchor") }
+                    }
+                }))
+            host.sizingOptions = []; p.contentView = host; pill = p
         }
-        if let screen = NSScreen.screens.first(where: { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) }) ?? NSScreen.main {
-            let height = OverlayLayout.height(model.transcript)
-            pill?.setFrame(NSRect(x: screen.visibleFrame.maxX - 236 - 16, y: screen.visibleFrame.minY + 16, width: 236, height: height), display: true)
+        if bubbleAnchor == nil {
+            if let saved = UserDefaults.standard.string(forKey: "bubbleAnchor") { bubbleAnchor = NSPointFromString(saved) }
+            else if let screen = NSScreen.main { bubbleAnchor = CGPoint(x: screen.visibleFrame.maxX - 16, y: screen.visibleFrame.minY + 16) }
+        }
+        if var anchor = bubbleAnchor, let screen = NSScreen.screens.first(where: { $0.frame.contains(CGPoint(x: anchor.x - 22, y: anchor.y + 22)) }) ?? NSScreen.main {
+            let width: CGFloat = expanded ? 236 : 44
+            let height: CGFloat = expanded ? OverlayLayout.height(model.transcript) : 44
+            anchor.x = min(screen.visibleFrame.maxX - 8, max(screen.visibleFrame.minX + width + 8, anchor.x))
+            anchor.y = min(screen.visibleFrame.maxY - height - 8, max(screen.visibleFrame.minY + 8, anchor.y))
+            bubbleAnchor = anchor
+            let frame = NSRect(x: anchor.x - width, y: anchor.y, width: width, height: height)
+            if pillExpanded != expanded, pill?.isVisible == true, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0.26
+                    context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                    pill?.animator().setFrame(frame, display: true)
+                }
+            } else { pill?.setFrame(frame, display: true) }
+            pillExpanded = expanded
         }
         pill?.orderFrontRegardless()
     }
@@ -74,6 +113,12 @@ import SwiftUI
     public func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     public func application(_ application: NSApplication, open urls: [URL]) { if urls.contains(where: { $0.scheme == "jot" && $0.host == "toggle" }) { model.toggle() } }
     public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if model.classes.isActive { model.classes.notice = "Class recording is running. Stop it before quitting."; return .terminateCancel }
         if model.recording || model.finishing { model.notice = "Finish recording before quitting."; return .terminateCancel }; return .terminateNow
     }
+}
+
+private final class RecordingPanel: NSPanel {
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
 }

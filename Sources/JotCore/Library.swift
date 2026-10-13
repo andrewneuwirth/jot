@@ -23,6 +23,9 @@ public struct Dictation: Codable, Identifiable {
     public var id = UUID()
     public var date = Date()
     public var text: String
+    public var originalText: String?
+    public var cleanupMS: Double?
+    public var cleanupStatus: String?
     public var audioFile: String?
     public var duration: Double
     public var finishMS: Double

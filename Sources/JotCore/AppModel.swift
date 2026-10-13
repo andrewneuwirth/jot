@@ -3,9 +3,22 @@ import AVFoundation
 import SwiftUI
 import ServiceManagement
 
+enum FloatingIconAppearance: String, CaseIterable, Identifiable {
+    case system, light, dark
+    var id: String { rawValue }
+    var title: String { rawValue.capitalized }
+}
+
 @MainActor public final class AppModel: ObservableObject {
     public let library = Library()
     let speech = SpeechEngine()
+    public let classes = ClassRecorder()
+    private let cleanup = LocalCleanup()
+    @Published var cleanupEnabled = UserDefaults.standard.object(forKey: "cleanupEnabled") as? Bool ?? true
+    @Published var cleanupStatus = "Qwen 3.5 4B · local"
+    private var originalTranscript: String?
+    private var cleanupResult: CleanupResult?
+    private var finishingDestinationCaptured = false
     private let recorder = Recorder()
     private let insertion = TextInsertion()
     private let hotkeys = GlobalHotkeys()
@@ -43,6 +56,9 @@ import ServiceManagement
     @Published var liveInsertion = UserDefaults.standard.object(forKey: "liveInsertion") as? Bool ?? true
     @Published var keepAudio = UserDefaults.standard.object(forKey: "keepAudio") as? Bool ?? false
     @Published var microphoneID = UInt32(UserDefaults.standard.integer(forKey: "microphoneID"))
+    @Published var floatingIconAppearance = FloatingIconAppearance(rawValue: UserDefaults.standard.string(forKey: "floatingIconAppearance") ?? "system") ?? .system {
+        didSet { UserDefaults.standard.set(floatingIconAppearance.rawValue, forKey: "floatingIconAppearance") }
+    }
     @Published var modelLoadMS: Double = 0
     @Published var previewStatus = "Apple on-device speech"
     var overlayChanged: (() -> Void)?
@@ -52,6 +68,7 @@ import ServiceManagement
             UserDefaults.standard.set("ultra", forKey: "mode")
             UserDefaults.standard.set(true, forKey: "ultraMigration")
         }
+        hotkeys.smartPaste = { SmartPaste.perform() }
         hotkeys.toggle = { [weak self] in self?.toggle() }
         hotkeys.cancel = { [weak self] in self?.cancel() }
         hotkeys.isRecording = { [weak self] in self?.recording == true }
@@ -59,7 +76,7 @@ import ServiceManagement
         recorder.onError = { [weak self] text in Task { @MainActor in self?.notice = "Audio backup: \(text)" } }
         selection = library.notes.first?.id
     }
-    public func start() { library.recoverInterruptedRecordings(); refreshPermissions(); Task { await loadModel() } }
+    public func start() { library.recoverInterruptedRecordings(); refreshPermissions(); Task { await loadModel(); if cleanupEnabled { cleanupStatus = await cleanup.warm() ? "Qwen 3.5 4B · ready locally" : "Start Ollama to enable cleanup" } } }
     func refreshPermissions() { hotkeysReady = hotkeys.start() }
     func requestAccessibility() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
@@ -71,6 +88,7 @@ import ServiceManagement
     }
     func persistPreferences() {
         let d = UserDefaults.standard
+        d.set(cleanupEnabled, forKey: "cleanupEnabled")
         d.set(mode.rawValue, forKey: "mode"); d.set(liveInsertion, forKey: "liveInsertion"); d.set(keepAudio, forKey: "keepAudio"); d.set(Int(microphoneID), forKey: "microphoneID")
     }
     func loadModel() async {
@@ -84,12 +102,14 @@ import ServiceManagement
     func toggle(note: UUID? = nil) {
         if recording { stop(); return }
         guard !finishing, !busy else { return }
+        guard !classes.isActive else { notice = "Class recording is running. Stop it first, or dictate after class."; return }
         guard ready else { notice = "Load the model in Settings first."; showSettings = true; return }
         guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { requestMicrophone(); return }
         insertion.capture()
         noteTarget = note
         noteOriginal = library.notes.first(where: { $0.id == note })?.body ?? ""
         noteExpected = noteOriginal; noteInsertionPaused = false; currentAudioURL = nil
+        originalTranscript = nil; cleanupResult = nil; finishingDestinationCaptured = false
         transcript = ""; notice = ""; cancelled = false; seconds = 0; level = 0
         let current = UUID(); session = current
         recording = true; showOverlay = true; state = "Starting…"; overlayChanged?()
@@ -109,7 +129,13 @@ import ServiceManagement
                 for await buffer in stream { try await speech.process(buffer) }
                 let raw = try await speech.finish(recordingURL: currentAudioURL)
                 let final = TranscriptTools.applyVocabulary(raw, rules: library.vocabulary)
-                complete(final)
+                originalTranscript = final
+                if cleanupEnabled, !cancelled, !final.isEmpty {
+                    state = "Cleaning up…"; overlayChanged?()
+                    cleanupResult = await cleanup.clean(final)
+                    cleanupStatus = cleanupResult!.status
+                }
+                complete(cleanupResult?.text ?? final)
             } catch {
                 recorder.stop(); timer?.invalidate(); recording = false; finishing = false; showOverlay = false
                 state = "Ready"; notice = "Dictation failed: \(error.localizedDescription). Your recording is in History."
@@ -119,6 +145,7 @@ import ServiceManagement
         }
     }
     private func receive(_ text: String) {
+        guard !finishingDestinationCaptured else { return }
         transcript = TranscriptTools.applyVocabulary(text, rules: library.vocabulary)
         if let id = noteTarget, let i = library.notes.firstIndex(where: { $0.id == id }) {
             guard !noteInsertionPaused, library.notes[i].body == noteExpected else { noteInsertionPaused = true; return }
@@ -129,6 +156,8 @@ import ServiceManagement
     }
     func stop() {
         guard recording else { return }
+        if !cancelled, noteTarget == nil { insertion.captureFinishDestination() }
+        finishingDestinationCaptured = true
         finishing = true; recording = false; state = "Finishing…"; stopped = Date(); timer?.invalidate()
         // Keep a brief physical tail for a key press that overlaps the final phoneme.
         let stoppingSession = session
@@ -156,7 +185,11 @@ import ServiceManagement
         else { notice = insertion.inserted.isEmpty ? "Transcript ready. Copy it below and paste where you want." : "Text focus changed. Full transcript saved; copy it below if needed." }
         let recover = keepAudio || cancelled || text.isEmpty || status == "Saved to history"
         let audio = currentAudioURL?.lastPathComponent
-        library.add(Dictation(text: text, audioFile: recover ? audio : nil, duration: seconds, finishMS: ms, model: mode.modelName, destination: noteTarget == nil ? insertion.destination : "Jot note", status: status))
+        var entry = Dictation(text: text, audioFile: recover ? audio : nil, duration: seconds, finishMS: ms, model: mode.modelName, destination: noteTarget == nil ? insertion.destination : "Jot note", status: status)
+        entry.originalText = originalTranscript
+        entry.cleanupMS = cleanupResult?.milliseconds
+        entry.cleanupStatus = cleanupResult?.status
+        library.add(entry)
         if !recover, let path = currentAudioURL { try? FileManager.default.removeItem(at: path) }
         transcript = text
         showOverlay = false
