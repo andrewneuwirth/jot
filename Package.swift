@@ -1,9 +1,10 @@
 // swift-tools-version: 6.2
 import PackageDescription
 let package = Package(name: "Jot", platforms: [.macOS(.v26)], products: [.executable(name: "Jot", targets: ["Jot"])], dependencies: [
-    .package(url: "https://github.com/FluidInference/FluidAudio.git", revision: "04e363c29d9a754022d602d6fe1468ab80a0f705", traits: [])
+    .package(url: "https://github.com/FluidInference/FluidAudio.git", revision: "04e363c29d9a754022d602d6fe1468ab80a0f705", traits: []),
+    .package(path: "../Kit")
 ], targets: [
-    .target(name: "JotCore", dependencies: [.product(name: "FluidAudio", package: "FluidAudio")]),
+    .target(name: "JotCore", dependencies: [.product(name: "FluidAudio", package: "FluidAudio"), .product(name: "MacToolsKit", package: "Kit")]),
     .executableTarget(name: "Jot", dependencies: ["JotCore"]),
     .testTarget(name: "JotTests", dependencies: ["JotCore"])
 ], swiftLanguageModes: [.v5])

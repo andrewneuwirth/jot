@@ -9,7 +9,7 @@ A local macOS dictation and notes app. Native SwiftUI/AppKit, NVIDIA Parakeet Re
 - Front/top mouse side button: Control–Command–V: delete selected editable text, otherwise paste. Ordinary keyboard Command–V is unchanged.
 - Notes: create, edit, pin, organize in folders, search, export. Formatting toolbar inserts Markdown.
 - Dictation History: recover, copy, save as a note, retry/play retained recordings.
-- Settings: actual selected model/mode, microphone, permissions, launch at login, vocabulary, local storage and real benchmarks.
+- Settings: actual selected model/mode, microphone, permissions, Open at Login, vocabulary, local storage and real benchmarks.
 
 Microphone access is required to record. Accessibility access is required for global shortcuts and insertion into other apps. Enable these for **Jot** in macOS Privacy & Security, then click Refresh in Settings.
 
@@ -40,3 +40,6 @@ Notes, transcripts, spelling rules and measurements: `~/Library/Application Supp
 ## License and attribution
 
 Jot code: MIT (LICENSE). FluidAudio has its own Apache-2.0 license. NVIDIA's model and FluidInference's conversion retain their respective license/model terms, linked from Settings. Model weights are downloaded, not checked into this repo. The `jfk.wav` benchmark fixture comes from https://github.com/ggml-org/whisper.cpp/blob/master/samples/jfk.wav and contains an excerpt of President Kennedy's public inaugural address. It is a short smoke test, not a general accuracy evaluation.
+
+Part of the Mac Tools family: its accent, status colours, glass sidebar, Open at Login and icon plate come
+from `../Kit` (MacToolsKit), so build it with Kit cloned beside it.

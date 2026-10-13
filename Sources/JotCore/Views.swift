@@ -2,9 +2,9 @@ import SwiftUI
 import AppKit
 import AVFoundation
 import CoreAudio
-import ServiceManagement
+import MacToolsKit
 
-private let jotBlue = Color(red: 0.20, green: 0.55, blue: 0.98)
+private let jotBlue = Color.mtJot
 struct MainView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var library: Library
@@ -85,13 +85,15 @@ struct MainView: View {
             HStack { Text("Folders").foregroundStyle(.secondary); Spacer(); Button { addingFolder = true } label: { Image(systemName: "plus") }.buttonStyle(.plain) }.font(.caption).padding(.horizontal, 14).padding(.top, 24).padding(.bottom, 5)
             ForEach(library.folders, id: \.self) { nav($0, "folder") }
             Spacer()
-            Button { model.showSettings = true } label: { Label("Settings", systemImage: "gearshape").frame(maxWidth: .infinity, alignment: .leading).padding(11).background(model.showSettings ? jotBlue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 9)) }.buttonStyle(.plain)
-            HStack { Circle().fill(model.recording || model.classes.isActive ? .red : (model.ready ? .green : .orange)).frame(width: 8, height: 8); Text(model.classes.isActive ? "Class · " + formatClock(model.classes.elapsed) : model.state).font(.caption.monospacedDigit()).lineLimit(2) }.padding(12)
-        }.padding(10).background(.regularMaterial)
+            Button { model.showSettings = true } label: { Label("Settings", systemImage: "gearshape").frame(maxWidth: .infinity, alignment: .leading).padding(11).background(model.showSettings ? jotBlue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: MT.Radius.row)) }.buttonStyle(.plain)
+            HStack { Circle().fill(model.recording || model.classes.isActive ? Color.mtBad : (model.ready ? Color.mtGood : Color.mtWarn)).frame(width: 8, height: 8); Text(model.classes.isActive ? "Class · " + formatClock(model.classes.elapsed) : model.state).font(.caption.monospacedDigit()).lineLimit(2) }.padding(12)
+        }.padding(10)
+        .glassEffect(.regular, in: .rect(cornerRadius: MT.Radius.section))
+        .padding(MT.Space.s8)
     }
     func nav(_ title: String, _ icon: String) -> some View {
         Button { model.section = title; model.showSettings = false; model.search = ""; model.selection = title == "Dictation History" ? library.history.first?.id : library.notes.first(where: { title == "Notes" || (title == "Pinned" && $0.pinned) || $0.folder == title })?.id } label: {
-            Label(title, systemImage: icon).frame(maxWidth: .infinity, alignment: .leading).padding(11).background(!model.showSettings && model.section == title ? jotBlue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 9))
+            Label(title, systemImage: icon).frame(maxWidth: .infinity, alignment: .leading).padding(11).background(!model.showSettings && model.section == title ? jotBlue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: MT.Radius.row))
         }.buttonStyle(.plain)
     }
     @ViewBuilder var detail: some View {
@@ -151,7 +153,7 @@ struct SettingsView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var library: Library
     @State private var page = "Model"
-    @State private var login = SMAppService.mainApp.status == .enabled
+    @State private var login = LoginItem.isEnabled
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -199,8 +201,8 @@ struct SettingsView: View {
                 if page == "Privacy" {
                 VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 12) {
-                        Toggle("Launch Jot at login", isOn: $login).onChange(of: login) { _, enabled in
-                            do { if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() } } catch { model.notice = error.localizedDescription; login = SMAppService.mainApp.status == .enabled }
+                        Toggle("Open at Login", isOn: $login).onChange(of: login) { _, enabled in
+                            if !LoginItem.set(enabled) { model.notice = "macOS didn't allow Open at Login."; login = LoginItem.isEnabled }
                         }
                         Toggle("Keep successful recordings for replay", isOn: $model.keepAudio)
                         Text("Transcripts stay in local history. Failed and interrupted recordings are retained for recovery. Successful audio is removed unless enabled above. No accounts, analytics, or cloud transcription.").font(.caption).foregroundStyle(.secondary)
@@ -241,7 +243,7 @@ struct SettingsView: View {
                 }.padding(16).background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 14))
                 }
                 if !model.notice.isEmpty { Text(model.notice).foregroundStyle(.secondary).textSelection(.enabled) }
-                if let error = library.error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
+                if let error = library.error { Text(error).foregroundStyle(Color.mtBad).textSelection(.enabled) }
                 Text("Jot 0.1 · Open-source app · Local inference powered by FluidAudio").font(.caption).foregroundStyle(.tertiary)
             }.padding(32).frame(maxWidth: 900)
         }
@@ -453,7 +455,7 @@ struct ClassView: View {
             } else {
                 Button { classes.start(microphoneID: model.microphoneID) } label: { Label("Record class", systemImage: "record.circle").frame(width: 160) }.controlSize(.large).buttonStyle(.borderedProminent).tint(.red)
             }
-            if !classes.notice.isEmpty { Text(classes.notice).font(.callout).foregroundStyle(.orange) }
+            if !classes.notice.isEmpty { Text(classes.notice).font(.callout).foregroundStyle(Color.mtWarn) }
         }.padding(24).frame(maxWidth: .infinity)
     }
     @ViewBuilder var transcript: some View {
