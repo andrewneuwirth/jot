@@ -59,7 +59,7 @@ enum FloatingIconAppearance: String, CaseIterable, Identifiable {
     @Published var floatingIconAppearance = FloatingIconAppearance(rawValue: UserDefaults.standard.string(forKey: "floatingIconAppearance") ?? "system") ?? .system {
         didSet { UserDefaults.standard.set(floatingIconAppearance.rawValue, forKey: "floatingIconAppearance") }
     }
-    @Published var spaceHold = UserDefaults.standard.object(forKey: "spaceHold") as? Bool ?? true {
+    @Published var spaceHold = UserDefaults.standard.object(forKey: "spaceHold") as? Bool ?? false {
         didSet { UserDefaults.standard.set(spaceHold, forKey: "spaceHold") }
     }
     @Published var spaceHoldApps = UserDefaults.standard.string(forKey: "spaceHoldApps") ?? SpaceHold.defaultApps {
