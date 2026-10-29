@@ -188,6 +188,12 @@ struct SettingsView: View {
                         LabeledContent("Rear / bottom mouse button", value: "Dictation · ⌃⌘J")
                         LabeledContent("Front / top mouse button", value: "Paste · ⌘V")
                         LabeledContent("Escape", value: "Cancel recording")
+                        Toggle("Hold Space to talk in chosen apps", isOn: $model.spaceHold)
+                        if model.spaceHold {
+                            Text("Hold Space for a moment to dictate; release to insert the raw transcript (no cleanup). A quick tap still types a space, and Space with ⌘ ⌥ ⌃ ⇧ is untouched. Apps not listed never see a change. One bundle ID per line:").font(.caption).foregroundStyle(.secondary)
+                            TextEditor(text: $model.spaceHoldApps).font(.system(.body, design: .monospaced)).frame(height: 110).border(Color.secondary.opacity(0.2))
+                            Button("Add app…") { model.addSpaceHoldApp() }
+                        }
                         Toggle("Show words in the text box as I speak", isOn: $model.liveInsertion)
                         Picker("Floating bubble appearance", selection: $model.floatingIconAppearance) {
                             ForEach(FloatingIconAppearance.allCases) { appearance in

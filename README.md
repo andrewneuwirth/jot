@@ -5,6 +5,7 @@ A local macOS dictation and notes app. Native SwiftUI/AppKit, NVIDIA Parakeet Re
 ## Use
 
 - Globe: tap to start, tap again to finish. Escape cancels.
+- Space (bb, ChatGPT, Claude, Terminal, Ghostty, iTerm; edit in Settings → Controls): hold ≥ 0.35 s to talk, release to insert the raw transcript (no cleanup). A tap types a space; Space with modifiers is untouched.
 - Rear/bottom mouse side button: Ctrl–Command–J, toggles dictation.
 - Front/top mouse side button: Control–Command–V: delete selected editable text, otherwise paste. Ordinary keyboard Command–V is unchanged.
 - Notes: create, edit, pin, organize in folders, search, export. Formatting toolbar inserts Markdown.
@@ -29,6 +30,7 @@ JOT_ADHOC=1 ./build.sh          # local development fallback without signing key
 .build/release/Jot --prepare-model
 .build/release/Jot --benchmark Tests/Fixtures/jfk.wav --reference "And so my fellow Americans ask not what your country can do for you ask what you can do for your country"
 .build/release/Jot --benchmark Tests/Fixtures/jfk.wav --320
+/Applications/Jot.app/Contents/MacOS/Jot --transcribe clip.m4a   # raw transcript on stdout (wav/m4a/mp3/flac/caf/ogg/webm-opus), exit 0; error on stderr, exit 1
 ```
 
 Swift 6.2+ and macOS 26+ on Apple Silicon. Dependency revision is pinned in Package.swift and Package.resolved.

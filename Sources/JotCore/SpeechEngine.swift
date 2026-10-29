@@ -100,6 +100,33 @@ public actor SpeechEngine {
         return "\(String(cString: bytes)) · macOS \(ProcessInfo.processInfo.operatingSystemVersionString)"
     }
 }
+/// `Jot --transcribe <file>` for other local tools: raw Ultra transcript on stdout.
+public enum TranscribeCommand {
+    /// nil when this is not a transcribe invocation; otherwise the file or a usage error.
+    public static func parse(_ arguments: [String]) -> Result<URL, JotError>? {
+        guard let i = arguments.firstIndex(of: "--transcribe") else { return nil }
+        guard arguments.count > i + 1, !arguments[i + 1].isEmpty, !arguments[i + 1].hasPrefix("--") else {
+            return .failure(.message("Usage: Jot --transcribe <path-to-audio-file>"))
+        }
+        return .success(URL(fileURLWithPath: arguments[i + 1]))
+    }
+    /// Loads only the cached Ultra weights (never downloads) and skips cleanup and vocabulary.
+    public static func run(_ url: URL) async throws -> String {
+        guard FileManager.default.fileExists(atPath: url.path) else { throw JotError.message("No audio file at \(url.path)") }
+        let config = MLModelConfiguration(); config.computeUnits = .cpuAndNeuralEngine
+        let models: AsrModels
+        do { models = try AsrModels.loadLocal(from: JotPaths.models.appendingPathComponent("parakeet-ultra"), version: .ultra, configuration: config) }
+        catch { throw JotError.message("Parakeet Ultra is not on this Mac yet. Open Jot once to download it. (\(error.localizedDescription))") }
+        let manager = AsrManager(config: .default)
+        try await manager.loadModels(models)
+        var state = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
+        // AVAudioFile reads wav/aiff/caf/m4a/mp3/flac/Ogg Opus; WebM (bb/Chromium voice notes) is demuxed here.
+        let result: ASRResult
+        if WebMOpus.isWebM(url) { result = try await manager.transcribe(WebMOpus.decode(url), decoderState: &state) }
+        else { result = try await manager.transcribe(url, decoderState: &state) }
+        return result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
 public enum JotError: LocalizedError {
     case message(String)
     public var errorDescription: String? { if case .message(let text) = self { return text }; return nil }

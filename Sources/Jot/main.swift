@@ -3,6 +3,14 @@ import JotCore
 
 @main struct Main {
     @MainActor static func main() {
+        // Headless for other tools: no NSApplication, so no Dock icon, windows or effect on a running Jot.
+        if let request = TranscribeCommand.parse(CommandLine.arguments) {
+            Task {
+                do { let text = try await TranscribeCommand.run(request.get()); print(text); exit(0) }
+                catch { fputs("Jot: \(error.localizedDescription)\n", stderr); exit(1) }
+            }
+            dispatchMain()
+        }
         if CommandLine.arguments.contains("--prepare-model") || CommandLine.arguments.contains("--benchmark") {
             Task { await command(); exit(0) }
             dispatchMain()

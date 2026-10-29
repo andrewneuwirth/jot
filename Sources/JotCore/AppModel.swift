@@ -59,6 +59,13 @@ enum FloatingIconAppearance: String, CaseIterable, Identifiable {
     @Published var floatingIconAppearance = FloatingIconAppearance(rawValue: UserDefaults.standard.string(forKey: "floatingIconAppearance") ?? "system") ?? .system {
         didSet { UserDefaults.standard.set(floatingIconAppearance.rawValue, forKey: "floatingIconAppearance") }
     }
+    @Published var spaceHold = UserDefaults.standard.object(forKey: "spaceHold") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(spaceHold, forKey: "spaceHold") }
+    }
+    @Published var spaceHoldApps = UserDefaults.standard.string(forKey: "spaceHoldApps") ?? SpaceHold.defaultApps {
+        didSet { UserDefaults.standard.set(spaceHoldApps, forKey: "spaceHoldApps") }
+    }
+    private var holdSession = false
     @Published var modelLoadMS: Double = 0
     @Published var previewStatus = "Apple on-device speech"
     var overlayChanged: (() -> Void)?
@@ -72,6 +79,13 @@ enum FloatingIconAppearance: String, CaseIterable, Identifiable {
         hotkeys.toggle = { [weak self] in self?.toggle() }
         hotkeys.cancel = { [weak self] in self?.cancel() }
         hotkeys.isRecording = { [weak self] in self?.recording == true }
+        hotkeys.holdToTalk = { [weak self] down in self?.holdToTalk(down) }
+        // Only hold back Space when a dictation would really start; otherwise it types normally.
+        hotkeys.spaceHoldAllowed = { [weak self] in
+            guard let self, self.spaceHold, self.ready, !self.busy, !self.recording, !self.finishing, !self.classes.isActive,
+                  AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { return false }
+            return SpaceHold.allows(NSWorkspace.shared.frontmostApplication?.bundleIdentifier, in: self.spaceHoldApps)
+        }
         recorder.onLevel = { [weak self] value in Task { @MainActor in self?.level = value } }
         recorder.onError = { [weak self] text in Task { @MainActor in self?.notice = "Audio backup: \(text)" } }
         selection = library.notes.first?.id
@@ -99,14 +113,24 @@ enum FloatingIconAppearance: String, CaseIterable, Identifiable {
         catch { state = "Model unavailable"; notice = error.localizedDescription }
         busy = false
     }
-    func toggle(note: UUID? = nil) {
+    func holdToTalk(_ down: Bool) {
+        if down { if !recording { toggle(skipCleanup: true) } }
+        else if holdSession, recording { stop() }
+    }
+    func addSpaceHoldApp() {
+        let panel = NSOpenPanel(); panel.allowedContentTypes = [.application]; panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        guard panel.runModal() == .OK, let url = panel.url, let id = Bundle(url: url)?.bundleIdentifier, !SpaceHold.allows(id, in: spaceHoldApps) else { return }
+        spaceHoldApps += (spaceHoldApps.isEmpty || spaceHoldApps.hasSuffix("\n") ? "" : "\n") + id
+    }
+    /// raw: hold-to-talk sends the transcript as spoken, skipping local cleanup.
+    func toggle(note: UUID? = nil, skipCleanup: Bool = false) {
         if recording { stop(); return }
         guard !finishing, !busy else { return }
         guard !classes.isActive else { notice = "Class recording is running. Stop it first, or dictate after class."; return }
         guard ready else { notice = "Load the model in Settings first."; showSettings = true; return }
         guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { requestMicrophone(); return }
         insertion.capture()
-        noteTarget = note
+        noteTarget = note; holdSession = skipCleanup
         noteOriginal = library.notes.first(where: { $0.id == note })?.body ?? ""
         noteExpected = noteOriginal; noteInsertionPaused = false; currentAudioURL = nil
         originalTranscript = nil; cleanupResult = nil; finishingDestinationCaptured = false
@@ -130,7 +154,7 @@ enum FloatingIconAppearance: String, CaseIterable, Identifiable {
                 let raw = try await speech.finish(recordingURL: currentAudioURL)
                 let final = TranscriptTools.applyVocabulary(raw, rules: library.vocabulary)
                 originalTranscript = final
-                if cleanupEnabled, !cancelled, !final.isEmpty {
+                if cleanupEnabled, !skipCleanup, !cancelled, !final.isEmpty {
                     state = "Cleaning up…"; overlayChanged?()
                     cleanupResult = await cleanup.clean(final)
                     cleanupStatus = cleanupResult!.status
