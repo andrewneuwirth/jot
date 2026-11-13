@@ -48,6 +48,8 @@ public enum ClassPaths {
     private let segmentLength: TimeInterval = 15 * 60
     private var microphoneID: UInt32 = 0
     private var generation = 0
+    private var macAudio: SystemAudioTap? // set while recording a call (mic + Mac audio)
+    private var inputID: UInt32? { macAudio.map { $0.deviceID } ?? (microphoneID == 0 ? nil : microphoneID) }
 
     public init() { load() }
 
@@ -62,7 +64,8 @@ public enum ClassPaths {
 
     // MARK: Start / stop
 
-    public func start(microphoneID: UInt32) {
+    /// `includeMacAudio`: also record what the Mac plays (both sides of a FaceTime/Zoom call).
+    public func start(microphoneID: UInt32, includeMacAudio: Bool = false) {
         guard active == nil else { return }
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized: break
@@ -72,10 +75,15 @@ public enum ClassPaths {
         default: notice = "Enable Jot in Privacy & Security → Microphone."; return
         }
         self.microphoneID = microphoneID
+        if includeMacAudio {
+            let tap = SystemAudioTap()
+            do { _ = try tap.start(microphoneID: microphoneID); macAudio = tap }
+            catch { notice = error.localizedDescription; return }
+        }
         let f = DateFormatter(); f.dateFormat = "EEE MMM d · h:mm a"
-        var session = ClassSession(title: "Class · " + f.string(from: Date()))
+        var session = ClassSession(title: (includeMacAudio ? "Call · " : "Class · ") + f.string(from: Date()))
         do { try FileManager.default.createDirectory(at: ClassPaths.directory(session), withIntermediateDirectories: true) }
-        catch { notice = "Could not create the recording folder: \(error.localizedDescription)"; return }
+        catch { notice = "Could not create the recording folder: \(error.localizedDescription)"; macAudio?.stop(); macAudio = nil; return }
         session.status = "Recording"
         active = session; sessions.insert(session, at: 0)
         committed = ""; live = ""; carried = 0; elapsed = 0; notice = ""; started = Date(); lastBuffer = Date()
@@ -96,6 +104,7 @@ public enum ClassPaths {
         // Brief tail so the last words are not clipped.
         try? await Task.sleep(nanoseconds: 300_000_000)
         finishing?.recorder.stop()
+        macAudio?.stop(); macAudio = nil
         let tail = await finishing?.task?.value ?? ""
         committed = join(committed, tail); live = ""
         session = current(session)
@@ -114,7 +123,7 @@ public enum ClassPaths {
         guard var session = active else { return }
         let dir = ClassPaths.directory(session)
         do {
-            let stream = try seg.recorder.start(deviceID: microphoneID == 0 ? nil : microphoneID, directory: dir)
+            let stream = try seg.recorder.start(deviceID: inputID, directory: dir, mixdown: macAudio != nil)
             seg.file = seg.recorder.url?.lastPathComponent
             if let file = seg.file { session.segments.append(file); active = session; update(session); saveActive(force: true) }
             seg.recorder.onLevel = { [weak self] v in Task { @MainActor in self?.level = v } }

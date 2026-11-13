@@ -459,7 +459,11 @@ struct ClassView: View {
                 }.font(.callout)
                 Button { confirmStop = true } label: { Label("Stop", systemImage: "stop.fill").frame(width: 140) }.controlSize(.large).buttonStyle(.borderedProminent).tint(.red)
             } else {
-                Button { classes.start(microphoneID: model.microphoneID) } label: { Label("Record class", systemImage: "record.circle").frame(width: 160) }.controlSize(.large).buttonStyle(.borderedProminent).tint(.red)
+                HStack(spacing: 12) {
+                    Button { classes.start(microphoneID: model.microphoneID) } label: { Label("Record class", systemImage: "record.circle").frame(width: 160) }.controlSize(.large).buttonStyle(.borderedProminent).tint(.red)
+                    Button { classes.start(microphoneID: model.microphoneID, includeMacAudio: true) } label: { Label("Record call", systemImage: "phone.circle").frame(width: 160) }.controlSize(.large).buttonStyle(.bordered)
+                        .help("Records your mic plus everything the Mac plays, so both sides of a FaceTime or Zoom call are transcribed.")
+                }
             }
             if !classes.notice.isEmpty { Text(classes.notice).font(.callout).foregroundStyle(Color.mtWarn) }
         }.padding(24).frame(maxWidth: .infinity)

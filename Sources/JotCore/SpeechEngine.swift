@@ -144,7 +144,9 @@ public final class Recorder {
     public var onLevel: ((Float) -> Void)?
     public var onError: ((String) -> Void)?
     public init() {}
-    public func start(deviceID: AudioDeviceID? = nil, directory: URL = JotPaths.recordings) throws -> AsyncStream<AVAudioPCMBuffer> {
+    /// `mixdown`: fold every input channel into one (for the mic + system-audio device, whose
+    /// extra channels the transcriber would otherwise ignore).
+    public func start(deviceID: AudioDeviceID? = nil, directory: URL = JotPaths.recordings, mixdown: Bool = false) throws -> AsyncStream<AVAudioPCMBuffer> {
         try JotPaths.prepare()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let e = AVAudioEngine()
@@ -155,15 +157,22 @@ public final class Recorder {
         }
         let format = input.outputFormat(forBus: 0)
         guard format.sampleRate > 0, format.channelCount > 0 else { throw JotError.message("No microphone is available.") }
+        let mono = mixdown && format.channelCount > 1 ? AVAudioFormat(standardFormatWithSampleRate: format.sampleRate, channels: 1) : nil
         let path = directory.appendingPathComponent("\(UUID().uuidString).caf")
-        file = try AVAudioFile(forWriting: path, settings: format.settings)
+        file = try AVAudioFile(forWriting: path, settings: (mono ?? format).settings)
         url = path
         let stream = AsyncStream<AVAudioPCMBuffer> { continuation = $0 }
         accepting = true
-        input.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self] buffer, _ in
+        input.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self] raw, _ in
             guard let self else { return }
             self.lock.lock(); defer { self.lock.unlock() }
             guard self.accepting else { return }
+            var buffer = raw
+            if let mono, let src = raw.floatChannelData, let mixed = AVAudioPCMBuffer(pcmFormat: mono, frameCapacity: raw.frameLength), let dst = mixed.floatChannelData {
+                mixed.frameLength = raw.frameLength
+                mixToMono((0..<Int(raw.format.channelCount)).map { UnsafePointer(src[$0]) }, frames: Int(raw.frameLength), into: dst[0])
+                buffer = mixed
+            }
             do { try self.file?.write(from: buffer) } catch { self.onError?(error.localizedDescription) }
             guard let copy = AVAudioPCMBuffer(pcmFormat: buffer.format, frameCapacity: buffer.frameLength) else { return }
             copy.frameLength = buffer.frameLength
