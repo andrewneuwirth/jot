@@ -103,6 +103,18 @@ final class JotTests: XCTestCase {
         XCTAssertEqual(t.update(start: 0, end: 2, text: "", isFinal: false), "I think so.")
         XCTAssertEqual(t.update(start: 3, end: 5, text: "I think so.", isFinal: true), "I think so. I think so.")
     }
+    func testPreviewRevisionWithShiftedRangeReplacesInsteadOfDuplicating() {
+        // From a real call: "Okay, good. Okay, good." / "speakeak … speak"
+        var t = PreviewTranscript()
+        _ = t.update(start: 5.00, end: 6.10, text: "Okay, good.", isFinal: false)
+        XCTAssertEqual(t.update(start: 5.04, end: 6.12, text: "Okay, good.", isFinal: true), "Okay, good.")
+        _ = t.update(start: 7.0, end: 9.0, text: "No, I actually speakeak.", isFinal: false)
+        XCTAssertEqual(t.update(start: 7.02, end: 8.9, text: "No, I actually speak.", isFinal: true), "Okay, good. No, I actually speak.")
+        // A later final for the same audio does not add a third copy.
+        XCTAssertEqual(t.update(start: 7.05, end: 8.95, text: "No, I actually speak.", isFinal: true), "Okay, good. No, I actually speak.")
+        // Saying the same words again later is kept.
+        XCTAssertEqual(t.update(start: 12, end: 13, text: "Okay, good.", isFinal: true), "Okay, good. No, I actually speak. Okay, good.")
+    }
     func testPreviewRetainsRetractedProvisionalTextUntilRecordingEnds() {
         var t = PreviewTranscript()
         _ = t.update(start: 0, end: 2, text: "Keep this.", isFinal: true)

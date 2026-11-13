@@ -24,14 +24,16 @@ struct PreviewTranscript {
         // Apple's empty volatile result retracts a hypothesis. For a recording
         // preview, keep what the user has already seen until final transcription.
         guard !cleaned.isEmpty else { return self.text }
-        if let index = segments.firstIndex(where: { abs($0.start - start) < 0.0001 }) {
+        // A revision of the same words can arrive with a slightly shifted range (common on
+        // mixed call audio), so "same phrase" means mostly the same audio, not an identical start.
+        if let index = segments.firstIndex(where: { abs($0.start - start) < 0.0001 || Self.sameAudio($0.start, $0.end, start, end) }) {
             let previous = segments[index]
             if previous.final { return self.text }
-            // Shorter revisions must not erase a sentence during a pause.
+            // Shorter provisional revisions must not erase a sentence during a pause; a final result is authoritative.
             let oldWords = previous.text.split(whereSeparator: \.isWhitespace).count
             let newWords = cleaned.split(whereSeparator: \.isWhitespace).count
-            guard newWords >= oldWords else { return self.text }
-            segments[index] = Segment(start: start, end: max(end, previous.end), text: cleaned, final: isFinal)
+            guard isFinal || newWords >= oldWords else { return self.text }
+            segments[index] = Segment(start: min(start, previous.start), end: max(end, previous.end), text: cleaned, final: isFinal)
         } else {
             // A new phrase can overlap the tail of the preceding audio range.
             // Never remove the preceding phrase simply because ranges overlap.
@@ -39,5 +41,12 @@ struct PreviewTranscript {
         }
         segments.sort { $0.start < $1.start }
         return self.text
+    }
+
+    /// Two ranges cover mostly the same audio: they overlap by at least half of the shorter one.
+    /// A new phrase that only clips the tail of the previous one stays separate.
+    static func sameAudio(_ a0: Double, _ a1: Double, _ b0: Double, _ b1: Double) -> Bool {
+        let overlap = min(a1, b1) - max(a0, b0)
+        return overlap > 0 && overlap >= 0.5 * max(0.05, min(a1 - a0, b1 - b0))
     }
 }
