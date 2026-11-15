@@ -1,0 +1,140 @@
+import SwiftUI
+import AppKit
+import AVFoundation
+import MacToolsKit
+
+struct SettingsPage: View {
+    @ObservedObject var model: AppModel
+    @ObservedObject var library: Library
+    @State private var login = LoginItem.isEnabled
+    var body: some View {
+        PageHeader(title: "Settings") {
+            SoftButton(title: "Show walkthrough", symbol: "sparkles") { model.showOnboarding = true }
+        }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                group("Permissions", "Granted to Jot in System Settings › Privacy & Security.") {
+                    // Re-reads the live state every couple of seconds while the page is open.
+                    TimelineView(.periodic(from: .now, by: 2)) { _ in PermissionRows(model: model) }
+                }
+                group("Shortcuts", nil) {
+                    SettingRow(title: "Start and finish dictation", detail: "Tap the Globe (fn) key. Set System Settings › Keyboard › “Press 🌐 key to” to Do Nothing.") { Keycap(text: "🌐 Globe") }
+                    SettingRow(title: "Cancel", detail: "While recording.") { Keycap(text: "esc") }
+                    SettingRow(title: "Hold Space to talk", detail: "In the apps below: hold Space for a moment, release to insert the raw transcript. A tap still types a space.") {
+                        Toggle("", isOn: $model.spaceHold).labelsHidden().toggleStyle(.switch)
+                    }
+                    if model.spaceHold {
+                        TextEditor(text: $model.spaceHoldApps).font(.system(size: 12, design: .monospaced)).frame(height: 96)
+                            .scrollContentBackground(.hidden).padding(6)
+                            .background(RoundedRectangle(cornerRadius: MT.Radius.control).fill(Look.fill))
+                        HStack { Text("One bundle ID per line.").font(.system(size: 11)).foregroundStyle(Look.muted); Spacer(); SoftButton(title: "Add app…", symbol: "plus") { model.addSpaceHoldApp() } }
+                    }
+                }
+                group("Dictation", nil) {
+                    SettingRow(title: "Microphone", detail: nil) {
+                        Picker("", selection: $model.microphoneID) { Text("System default").tag(UInt32(0)); ForEach(Microphones.list(), id: \.id) { Text($0.name).tag($0.id) } }
+                            .labelsHidden().frame(width: 220).disabled(model.recording || model.finishing)
+                    }
+                    SettingRow(title: "Type as I speak", detail: "Words appear in the text box live where the app allows it; otherwise Jot pastes when you stop.") {
+                        Toggle("", isOn: $model.liveInsertion).labelsHidden().toggleStyle(.switch)
+                    }
+                    SettingRow(title: "Floating bubble", detail: "The small button in the corner of the screen. Right-click it to hide it.") {
+                        Picker("", selection: $model.floatingIconAppearance) { ForEach(FloatingIconAppearance.allCases) { Text($0.title).tag($0) } }
+                            .labelsHidden().pickerStyle(.segmented).frame(width: 200)
+                    }
+                    SettingRow(title: "Spelling rules", detail: "One per line: spoken phrase = spelling. Example: eye phone = iPhone") { EmptyView() }
+                    TextEditor(text: $library.vocabulary).font(.system(size: 12, design: .monospaced)).frame(height: 70)
+                        .scrollContentBackground(.hidden).padding(6)
+                        .background(RoundedRectangle(cornerRadius: MT.Radius.control).fill(Look.fill))
+                }
+                group("Privacy and storage", "Everything stays on this Mac. No account, analytics or cloud transcription.") {
+                    SettingRow(title: "Open at Login", detail: nil) {
+                        Toggle("", isOn: $login).labelsHidden().toggleStyle(.switch).onChange(of: login) { _, on in
+                            if !LoginItem.set(on) { model.notice = "macOS didn't allow Open at Login."; login = LoginItem.isEnabled }
+                        }
+                    }
+                    SettingRow(title: "Keep audio of successful dictations", detail: "Failed and cancelled recordings are always kept so you can retry them.") {
+                        Toggle("", isOn: $model.keepAudio).labelsHidden().toggleStyle(.switch)
+                    }
+                    SettingRow(title: "Your library", detail: "~/Library/Application Support/Jot: notes, history, recordings and models.") {
+                        SoftButton(title: "Show in Finder", symbol: "folder") { NSWorkspace.shared.open(JotPaths.root) }
+                    }
+                }
+                group("Benchmarks", "Measured on this Mac. File benchmarks exclude model loading and aren't live microphone latency.") {
+                    SettingRow(title: SpeechEngine.hardware(), detail: medianFinish) {
+                        SoftButton(title: "Benchmark a file…", symbol: "speedometer", disabled: model.busy || model.recording || model.finishing) { model.benchmarkFile() }
+                    }
+                    ForEach(library.benchmarks.prefix(6)) { b in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(b.model).font(.system(size: 12, weight: .medium))
+                                Text("\(b.source) · \(String(format: "%.1f", b.audioSeconds)) s audio\(b.wordErrorRate.map { " · WER \(String(format: "%.1f", $0 * 100))%" } ?? "")").font(.system(size: 11)).foregroundStyle(Look.muted)
+                            }
+                            Spacer()
+                            Text("\(String(format: "%.1f", b.speed))× realtime").font(.system(size: 12.5, weight: .semibold)).foregroundStyle(Look.accent)
+                        }
+                    }
+                }
+                Text("Jot · open source from newi tools · local inference by FluidAudio").font(.system(size: 11)).foregroundStyle(.tertiary)
+            }
+            .padding([.horizontal, .bottom], 22)
+            .frame(maxWidth: 820, alignment: .leading).frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .onChange(of: model.liveInsertion) { _, _ in model.persistPreferences() }
+        .onChange(of: model.keepAudio) { _, _ in model.persistPreferences() }
+        .onChange(of: model.microphoneID) { _, _ in model.persistPreferences() }
+        .onChange(of: library.vocabulary) { _, _ in library.save() }
+    }
+
+    private var medianFinish: String? {
+        let timings = library.history.filter { $0.finishMS > 0 }.map(\.finishMS).sorted()
+        return timings.isEmpty ? nil : "Dictation finish delay: \(Int(timings[timings.count / 2])) ms median over \(timings.count) runs"
+    }
+
+    private func group<Content: View>(_ title: String, _ detail: String?, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(size: 14, weight: .semibold)).foregroundStyle(Look.ink).accessibilityAddTraits(.isHeader)
+                if let detail { Text(detail).font(.system(size: 12)).foregroundStyle(Look.muted) }
+            }
+            Card(padding: 14) { VStack(alignment: .leading, spacing: 4) { content() } }
+        }
+    }
+}
+
+/// Microphone, Accessibility and call audio, each with its live state and the button that fixes it.
+struct PermissionRows: View {
+    @ObservedObject var model: AppModel
+    var body: some View {
+        let mic = AVCaptureDevice.authorizationStatus(for: .audio)
+        let ax = AXIsProcessTrusted()
+        VStack(alignment: .leading, spacing: 4) {
+            SettingRow(title: "Microphone", detail: "To hear you. Required.") {
+                HStack(spacing: 8) {
+                    StatusPill(ok: mic == .authorized, text: mic == .authorized ? "Allowed" : "Not yet")
+                    if mic != .authorized {
+                        SoftButton(title: mic == .notDetermined ? "Allow" : "Open Settings", symbol: "mic") {
+                            if mic == .notDetermined { model.requestMicrophone() }
+                            else { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!) }
+                        }
+                    }
+                }
+            }
+            SettingRow(title: "Accessibility", detail: "For the Globe shortcut and typing into other apps.") {
+                HStack(spacing: 8) {
+                    StatusPill(ok: ax, text: ax ? (model.hotkeysReady ? "Allowed" : "Allowed · restart Jot") : "Not yet")
+                    if !ax { SoftButton(title: "Open Settings", symbol: "hand.raised") { model.requestAccessibility() } }
+                    else if !model.hotkeysReady { SoftButton(title: "Retry", symbol: "arrow.clockwise") { model.refreshPermissions() } }
+                }
+            }
+            SettingRow(title: "System audio", detail: "Only for Record Call. macOS asks the first time you record one.") {
+                HStack(spacing: 8) {
+                    StatusPill(ok: nil, text: "Asked when needed")
+                    SoftButton(title: "Open Settings", symbol: "speaker.wave.2") {
+                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture")!)
+                    }
+                }
+            }
+        }
+    }
+}

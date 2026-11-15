@@ -3,6 +3,32 @@ import AVFoundation
 import SwiftUI
 import ServiceManagement
 
+/// The sections of the main window, in sidebar order.
+public enum Page: String, CaseIterable, Identifiable {
+    case dictation, notes, classes, calls, models, settings
+    public var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .dictation: "Dictation"
+        case .notes: "Notes"
+        case .classes: "Record Class"
+        case .calls: "Record Call"
+        case .models: "Models"
+        case .settings: "Settings"
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .dictation: "waveform"
+        case .notes: "note.text"
+        case .classes: "graduationcap"
+        case .calls: "phone"
+        case .models: "cpu"
+        case .settings: "gearshape"
+        }
+    }
+}
+
 enum FloatingIconAppearance: String, CaseIterable, Identifiable {
     case system, light, dark
     var id: String { rawValue }
@@ -10,11 +36,12 @@ enum FloatingIconAppearance: String, CaseIterable, Identifiable {
 }
 
 @MainActor public final class AppModel: ObservableObject {
-    public let library = Library()
+    public let library: Library
     let speech = SpeechEngine()
-    public let classes = ClassRecorder()
+    public let classes: ClassRecorder
+    public let models: ModelStore
     private let cleanup = LocalCleanup()
-    @Published var cleanupEnabled = UserDefaults.standard.object(forKey: "cleanupEnabled") as? Bool ?? true
+    @Published var cleanupEnabled = UserDefaults.standard.object(forKey: "cleanupEnabled") as? Bool ?? false   // needs Ollama, so opt-in
     @Published var cleanupStatus = "Qwen 3.5 4B · local"
     private var originalTranscript: String?
     private var cleanupResult: CleanupResult?
@@ -50,11 +77,11 @@ enum FloatingIconAppearance: String, CaseIterable, Identifiable {
     @Published var notice = ""
     @Published var hotkeysReady = false
     @Published var selection: UUID?
-    @Published var section = "Notes"
+    @Published var page = Page.dictation
     @Published var search = ""
-    @Published var showSettings = false
+    @Published var showOnboarding = false
     @Published var showOverlay = false
-    @Published var mode: SpeechMode = SpeechMode(rawValue: UserDefaults.standard.string(forKey: "mode") ?? "160") ?? .fast
+    @Published var mode: SpeechMode = SpeechMode(rawValue: UserDefaults.standard.string(forKey: "mode") ?? "ultra") ?? .ultra
     @Published var liveInsertion = UserDefaults.standard.object(forKey: "liveInsertion") as? Bool ?? true
     @Published var keepAudio = UserDefaults.standard.object(forKey: "keepAudio") as? Bool ?? false
     @Published var microphoneID = UInt32(UserDefaults.standard.integer(forKey: "microphoneID"))
@@ -71,12 +98,9 @@ enum FloatingIconAppearance: String, CaseIterable, Identifiable {
     @Published var modelLoadMS: Double = 0
     @Published var previewStatus = "Apple on-device speech"
     var overlayChanged: (() -> Void)?
-    public init() {
-        if !UserDefaults.standard.bool(forKey: "ultraMigration") {
-            mode = .ultra
-            UserDefaults.standard.set("ultra", forKey: "mode")
-            UserDefaults.standard.set(true, forKey: "ultraMigration")
-        }
+    /// The preview passes made-up data; the app uses the real library, recordings and model folder.
+    public init(library: Library? = nil, classes: ClassRecorder? = nil, models: ModelStore? = nil) {
+        self.library = library ?? Library(); self.classes = classes ?? ClassRecorder(); self.models = models ?? ModelStore()
         hotkeys.smartPaste = { SmartPaste.perform() }
         hotkeys.toggle = { [weak self] in self?.toggle() }
         hotkeys.cancel = { [weak self] in self?.cancel() }
@@ -90,9 +114,25 @@ enum FloatingIconAppearance: String, CaseIterable, Identifiable {
         }
         recorder.onLevel = { [weak self] value in Task { @MainActor in self?.level = value } }
         recorder.onError = { [weak self] text in Task { @MainActor in self?.notice = "Audio backup: \(text)" } }
-        selection = library.notes.first?.id
+        selection = self.library.history.first?.id
     }
-    public func start() { library.recoverInterruptedRecordings(); refreshPermissions(); Task { await loadModel(); if cleanupEnabled { cleanupStatus = await cleanup.warm() ? "Qwen 3.5 4B · ready locally" : "Start Ollama to enable cleanup" } } }
+    /// First launch with no settings and no library: the walkthrough shows. Read before anything writes settings.
+    public static var isNewUser: Bool {
+        let d = UserDefaults.standard
+        return d.object(forKey: "onboarded") == nil && d.object(forKey: "mode") == nil
+            && !FileManager.default.fileExists(atPath: JotPaths.root.appendingPathComponent("library.json").path)
+    }
+    func finishOnboarding() { UserDefaults.standard.set(true, forKey: "onboarded"); persistPreferences(); showOnboarding = false }
+    /// Switches to a downloaded model (the Models page's Use button).
+    func use(_ next: SpeechMode) {
+        guard !recording, !finishing, !busy else { return }
+        mode = next; Task { await loadModel() }
+    }
+    public func start() {
+        library.recoverInterruptedRecordings(); refreshPermissions()
+        // A model that isn't on this Mac yet waits for the Models page or the walkthrough instead of a silent download.
+        guard models.isReady(mode) else { state = "Choose a model"; return }
+        Task { await loadModel(); if cleanupEnabled { cleanupStatus = await cleanup.warm() ? "Qwen 3.5 4B · ready locally" : "Start Ollama to enable cleanup" } } }
     func refreshPermissions() { hotkeysReady = hotkeys.start() }
     func requestAccessibility() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
@@ -111,7 +151,7 @@ enum FloatingIconAppearance: String, CaseIterable, Identifiable {
         guard !recording, !finishing, !busy else { return }
         ready = false; busy = true; state = "Preparing \(mode.title)…"; persistPreferences()
         let start = Date()
-        do { try await speech.load(mode); modelLoadMS = Date().timeIntervalSince(start) * 1000; previewStatus = await speech.previewStatus; ready = true; state = "Ready" }
+        do { try await speech.load(mode); modelLoadMS = Date().timeIntervalSince(start) * 1000; models.refresh(); previewStatus = await speech.previewStatus; ready = true; state = "Ready" }
         catch { state = "Model unavailable"; notice = error.localizedDescription }
         busy = false
     }
@@ -129,7 +169,7 @@ enum FloatingIconAppearance: String, CaseIterable, Identifiable {
         if recording { stop(); return }
         guard !finishing, !busy else { return }
         guard !classes.isActive else { notice = "Class recording is running. Stop it first, or dictate after class."; return }
-        guard ready else { notice = "Load the model in Settings first."; showSettings = true; return }
+        guard ready else { notice = models.isReady(mode) ? "The model is still loading." : "Download a speech model first."; if !models.isReady(mode) { page = .models }; return }
         guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { requestMicrophone(); return }
         insertion.capture()
         noteTarget = note; holdSession = skipCleanup
@@ -221,7 +261,7 @@ enum FloatingIconAppearance: String, CaseIterable, Identifiable {
         showOverlay = false
         overlayChanged?()
     }
-    func newNote() { section = "Notes"; selection = library.addNote() }
+    func newNote() { page = .notes; selection = library.addNote() }
     func benchmarkFile() {
         guard !busy, !recording, !finishing else { return }
         let panel = NSOpenPanel(); panel.allowedContentTypes = [.audio]; panel.canChooseDirectories = false

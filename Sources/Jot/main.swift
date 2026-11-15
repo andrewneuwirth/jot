@@ -3,7 +3,10 @@ import JotCore
 
 @main struct Main {
     @MainActor static func main() {
-        if CommandLine.arguments.contains("--self-check") { SelfCheck.run(); exit(0) }
+        if let i = CommandLine.arguments.firstIndex(of: "--ui-preview") {
+            UIPreview.run(into: CommandLine.arguments.dropFirst(i + 1).first ?? FileManager.default.currentDirectoryPath); exit(0)
+        }
+        if CommandLine.arguments.contains("--self-check") { Task { await SelfCheck.run(); exit(0) }; dispatchMain() }
         // Headless for other tools: no NSApplication, so no Dock icon, windows or effect on a running Jot.
         if let request = TranscribeCommand.parse(CommandLine.arguments) {
             Task {
@@ -39,7 +42,7 @@ import JotCore
     }
     @MainActor static func launch() {
         let app = NSApplication.shared
-        let delegate = JotApplication()
+        let delegate = JotApplication(showWalkthrough: AppModel.isNewUser)
         app.delegate = delegate
         withExtendedLifetime(delegate) { app.run() }
     }

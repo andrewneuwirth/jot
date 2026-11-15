@@ -3,11 +3,27 @@ import AVFoundation
 import CoreML
 import FluidAudio
 
-public enum SpeechMode: String, CaseIterable, Identifiable {
-    case ultra = "ultra", fast = "160", balanced = "320"
+public enum SpeechMode: String, CaseIterable, Identifiable, Sendable {
+    case ultra = "ultra", multilingual = "v3", fast = "160", balanced = "320"
     public var id: String { rawValue }
-    public var title: String { self == .ultra ? "Ultra + Apple live preview" : (self == .fast ? "Realtime · 160 ms" : "Balanced · 320 ms") }
-    public var modelName: String { self == .ultra ? "Parakeet Ultra · Apple preview" : "Parakeet Realtime EOU 120M · \(rawValue) ms" }
+    public var title: String {
+        switch self {
+        case .ultra: "Ultra + Apple live preview"
+        case .multilingual: "Multilingual + Apple live preview"
+        case .fast: "Realtime · 160 ms"
+        case .balanced: "Balanced · 320 ms"
+        }
+    }
+    public var modelName: String {
+        switch self {
+        case .ultra: "Parakeet Ultra · Apple preview"
+        case .multilingual: "Parakeet v3 · Apple preview"
+        case .fast, .balanced: "Parakeet Realtime EOU 120M · \(rawValue) ms"
+        }
+    }
+    /// Whole-recording models: Apple shows live words, the model transcribes the saved audio when you stop.
+    public var isBatch: Bool { self == .ultra || self == .multilingual }
+    var asrVersion: AsrModelVersion { self == .multilingual ? .v3 : .ultra }
     var chunk: StreamingChunkSize { self == .fast ? .ms160 : .ms320 }
 }
 public actor SpeechEngine {
@@ -19,11 +35,11 @@ public actor SpeechEngine {
 
     public init() {}
     public func load(_ mode: SpeechMode) async throws {
-        if loadedMode == mode, manager != nil { return }
+        if loadedMode == mode, manager != nil || ultra != nil { return }
         try JotPaths.prepare()
         let config = MLModelConfiguration(); config.computeUnits = .cpuAndNeuralEngine
-        if mode == .ultra {
-            let models = try await AsrModels.downloadAndLoad(to: JotPaths.models.appendingPathComponent("parakeet-ultra"), configuration: config, version: .ultra)
+        if mode.isBatch {
+            let models = try await AsrModels.downloadAndLoad(to: SpeechCatalog.folder(mode), configuration: config, version: mode.asrVersion)
             let next = AsrManager(config: .default)
             try await next.loadModels(models)
             ultra = next; manager = nil; loadedMode = mode
@@ -37,7 +53,7 @@ public actor SpeechEngine {
         manager = next; loadedMode = mode
     }
     public func begin(partial: @escaping @Sendable (String) -> Void) async throws {
-        if loadedMode == .ultra {
+        if loadedMode?.isBatch == true {
             do { try await apple.begin(partial: partial) }
             catch { previewStatus = error.localizedDescription }
             return
@@ -47,12 +63,12 @@ public actor SpeechEngine {
         await manager.setPartialCallback(partial)
     }
     public func process(_ buffer: AVAudioPCMBuffer) async throws {
-        if loadedMode == .ultra { await apple.append(buffer); return }
+        if loadedMode?.isBatch == true { await apple.append(buffer); return }
         guard let manager else { throw JotError.message("Model is not loaded.") }
         _ = try await manager.process(audioBuffer: buffer)
     }
     public func finish(recordingURL: URL? = nil) async throws -> String {
-        if loadedMode == .ultra {
+        if loadedMode?.isBatch == true {
             await apple.stop()
             guard let ultra, let recordingURL else { throw JotError.message("Original recording is unavailable for Ultra.") }
             var state = TdtDecoderState.make(decoderLayers: await ultra.decoderLayerCount)
@@ -72,11 +88,11 @@ public actor SpeechEngine {
     public func transcribeFile(_ url: URL, mode: SpeechMode, source: String, reference: String? = nil,
                                partial: @escaping @Sendable (String) -> Void = { _ in }) async throws -> Benchmark {
         try await load(mode)
-        if mode != .ultra { try await begin(partial: partial) }
+        if !mode.isBatch { try await begin(partial: partial) }
         let file = try AVAudioFile(forReading: url)
         let start = Date()
         let frames = AVAudioFrameCount(max(1, Int(file.processingFormat.sampleRate * 0.16)))
-        while mode != .ultra && file.framePosition < file.length {
+        while !mode.isBatch && file.framePosition < file.length {
             try Task.checkCancellation()
             let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: frames)!
             try file.read(into: buffer)
@@ -115,7 +131,7 @@ public enum TranscribeCommand {
         guard FileManager.default.fileExists(atPath: url.path) else { throw JotError.message("No audio file at \(url.path)") }
         let config = MLModelConfiguration(); config.computeUnits = .cpuAndNeuralEngine
         let models: AsrModels
-        do { models = try AsrModels.loadLocal(from: JotPaths.models.appendingPathComponent("parakeet-ultra"), version: .ultra, configuration: config) }
+        do { models = try AsrModels.loadLocal(from: SpeechCatalog.folder(.ultra), version: .ultra, configuration: config) }
         catch { throw JotError.message("Parakeet Ultra is not on this Mac yet. Open Jot once to download it. (\(error.localizedDescription))") }
         let manager = AsrManager(config: .default)
         try await manager.loadModels(models)

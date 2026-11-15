@@ -13,7 +13,11 @@ public struct ClassSession: Codable, Identifiable {
     public var transcript = ""
     public var liveTranscript = ""
     public var status = "Recording"
+    /// "call" or "class"; sessions saved before the two tabs split have none and are told apart by their title.
+    public var kind: String?
     public var folder: String { id.uuidString }
+    public var isCall: Bool { kind == "call" || (kind == nil && title.hasPrefix("Call")) }
+    public init(title: String, isCall: Bool) { self.title = title; kind = isCall ? "call" : "class" }
 }
 
 public enum ClassPaths {
@@ -52,6 +56,8 @@ public enum ClassPaths {
     private var inputID: UInt32? { macAudio.map { $0.deviceID } ?? (microphoneID == 0 ? nil : microphoneID) }
 
     public init() { load() }
+    /// Made-up sessions for the UI preview: nothing is read from or written to disk.
+    public init(preview: [ClassSession]) { sessions = preview }
 
     // MARK: Segment = one audio file + one Apple transcription run
 
@@ -81,7 +87,7 @@ public enum ClassPaths {
             catch { notice = error.localizedDescription; return }
         }
         let f = DateFormatter(); f.dateFormat = "EEE MMM d · h:mm a"
-        var session = ClassSession(title: (includeMacAudio ? "Call · " : "Class · ") + f.string(from: Date()))
+        var session = ClassSession(title: (includeMacAudio ? "Call · " : "Class · ") + f.string(from: Date()), isCall: includeMacAudio)
         do { try FileManager.default.createDirectory(at: ClassPaths.directory(session), withIntermediateDirectories: true) }
         catch { notice = "Could not create the recording folder: \(error.localizedDescription)"; macAudio?.stop(); macAudio = nil; return }
         session.status = "Recording"
