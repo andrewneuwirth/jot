@@ -67,7 +67,7 @@ struct Onboarding: View {
                 Text("Talk instead of type. Everything runs on this Mac.").font(.system(size: 14)).foregroundStyle(Look.muted)
             }
             VStack(alignment: .leading, spacing: 14) {
-                feature("waveform", "Dictate into any app", "Tap the Globe key, talk, tap again. Words land where your cursor is.")
+                feature("waveform", "Dictate into any app", "\(model.shortcut.verb) \(model.shortcut.isGlobe ? "the Globe key" : model.shortcut.name), talk, \(model.shortcut.verb.lowercased()) again. Words land where your cursor is.")
                 feature("note.text", "Notes", "Write, or dictate straight into a note.")
                 feature("graduationcap", "Record classes and calls", "Hours of audio saved as it goes, with a live transcript.")
             }
@@ -134,43 +134,51 @@ struct Onboarding: View {
     }
 
     private var shortcut: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            title("Your dictation shortcut", "Works in any app once Accessibility is allowed.")
+        let key = model.shortcut, verb = key.verb
+        return VStack(alignment: .leading, spacing: 0) {
+            title("Your dictation shortcut", "Works in any app once Accessibility is allowed. Globe (fn) is the default; record another if your keyboard has no Globe key.")
             Card {
                 HStack(spacing: 24) {
                     VStack(spacing: 8) {
-                        Text("🌐").font(.system(size: 30))
-                            .frame(width: 74, height: 64)
+                        Text(key.isGlobe ? "🌐" : key.keys.joined()).font(.system(size: key.isGlobe ? 30 : 20, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Look.ink).lineLimit(1).fixedSize()
+                            .padding(.horizontal, 14).frame(minWidth: 74, minHeight: 64)
                             .background(RoundedRectangle(cornerRadius: 12).fill(Look.card))
                             .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Look.line))
                             .shadow(color: .black.opacity(0.1), radius: 0, y: 2)
-                        Text("Globe / fn").font(.system(size: 11)).foregroundStyle(Look.muted)
+                        Text(key.isGlobe ? "Globe / fn" : (verb == "Tap" ? "Tap on its own" : "Press together")).font(.system(size: 11)).foregroundStyle(Look.muted)
                     }
                     VStack(alignment: .leading, spacing: 10) {
-                        Label("Tap to start talking", systemImage: "1.circle.fill")
-                        Label("Tap again to finish: the text is typed for you", systemImage: "2.circle.fill")
+                        Label("\(verb) to start talking", systemImage: "1.circle.fill")
+                        Label("\(verb) again to finish: the text is typed for you", systemImage: "2.circle.fill")
                         Label { Text("Press ") + Text("esc").bold() + Text(" to cancel") } icon: { Image(systemName: "xmark.circle.fill") }
                     }
                     .font(.system(size: 13.5)).foregroundStyle(Look.ink)
                     .symbolRenderingMode(.hierarchical)
                 }
             }
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "lightbulb").foregroundStyle(Color.mtWarn)
-                Text("If tapping Globe opens emoji or Apple's dictation, set System Settings › Keyboard › “Press 🌐 key to” to Do Nothing.")
-                    .font(.system(size: 12)).foregroundStyle(Look.muted).fixedSize(horizontal: false, vertical: true)
-                Spacer()
-                SoftButton(title: "Keyboard Settings", symbol: "keyboard") { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!) }
+            Card(padding: 14) { SettingRow(title: "Shortcut", detail: "For example ⌃⌥Space or Right ⌘.") { ShortcutRecorder(model: model) } }
+                .padding(.top, 12)
+            if key.isGlobe {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "lightbulb").foregroundStyle(Color.mtWarn)
+                    Text("If tapping Globe opens emoji or Apple's dictation, set System Settings › Keyboard › “Press 🌐 key to” to Do Nothing.")
+                        .font(.system(size: 12)).foregroundStyle(Look.muted).fixedSize(horizontal: false, vertical: true)
+                    Spacer()
+                    SoftButton(title: "Keyboard Settings", symbol: "keyboard") { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!) }
+                }
+                .padding(.top, 14)
             }
-            .padding(.top, 14)
         }
     }
+
+    private var shortName: String { model.shortcut.isGlobe ? "🌐" : model.shortcut.name }
 
     private var done: some View {
         VStack(spacing: 16) {
             Image(systemName: "checkmark.circle.fill").font(.system(size: 56)).foregroundStyle(Color.mtGood).padding(.top, 30)
             Text("You're set").font(.system(size: 26, weight: .bold)).foregroundStyle(Look.ink)
-            Text(models.isReady(model.mode) ? "Tap 🌐 anywhere and start talking." : "Download a model on the Models page when you're ready, then tap 🌐 anywhere.")
+            Text(models.isReady(model.mode) ? "\(model.shortcut.verb) \(shortName) anywhere and start talking." : "Download a model on the Models page when you're ready, then \(model.shortcut.verb.lowercased()) \(shortName) anywhere.")
                 .font(.system(size: 14)).foregroundStyle(Look.muted).multilineTextAlignment(.center).frame(maxWidth: 380)
             HStack(spacing: 8) {
                 Chip(text: "Everything stays on this Mac", symbol: "lock.fill")

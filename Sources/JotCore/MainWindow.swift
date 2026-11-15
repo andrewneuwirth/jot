@@ -91,7 +91,7 @@ struct Sidebar: View {
         .frame(width: 220)
     }
 
-    /// Start / finish dictation from the window, the same as the Globe key.
+    /// Start / finish dictation from the window, the same as the shortcut.
     private var dictateButton: some View {
         let live = model.recording
         return Button { model.toggle() } label: {
@@ -99,7 +99,10 @@ struct Sidebar: View {
                 Image(systemName: live ? "stop.fill" : "mic.fill").font(.system(size: 12, weight: .bold))
                 Text(live ? "Finish · \(formatDuration(model.seconds))" : (model.finishing ? "Finishing…" : "Dictate")).font(.system(size: 13.5, weight: .semibold)).monospacedDigit()
                 Spacer()
-                if !live && !model.finishing { Image(systemName: "globe").font(.system(size: 12, weight: .semibold)).opacity(0.75).padding(.trailing, 6) }
+                if !live && !model.finishing {
+                    Group { if model.shortcut.isGlobe { Image(systemName: "globe") } else { Text(model.shortcut.name).lineLimit(1).fixedSize() } }
+                        .font(.system(size: 12, weight: .semibold)).opacity(0.75).padding(.trailing, 6)
+                }
             }
             .foregroundStyle(.white)
             .padding(.leading, 14).padding(.trailing, 8).frame(height: 38)
@@ -108,7 +111,7 @@ struct Sidebar: View {
         }
         .buttonStyle(.plain)
         .disabled(model.finishing || model.busy)
-        .help(live ? "Finish dictation" : "Start dictation (or tap the Globe key anywhere)")
+        .help(live ? "Finish dictation" : "Start dictation (or \(model.shortcut.verb.lowercased()) \(model.shortcut.name) anywhere)")
     }
 
     private func group(_ title: String) -> some View {

@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import QuartzCore
 
-@MainActor public final class JotApplication: NSObject, NSApplicationDelegate, NSWindowDelegate {
+@MainActor public final class JotApplication: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuDelegate {
     private let model = AppModel()
     private var window: NSWindow?
     private var pill: NSPanel?
@@ -30,7 +30,7 @@ import QuartzCore
         menu.addItem(withTitle: "Start / finish dictation", action: #selector(toggle), keyEquivalent: "")
         menu.addItem(.separator()); menu.addItem(withTitle: "Settings…", action: #selector(settings), keyEquivalent: ",")
         menu.addItem(withTitle: "Quit Jot", action: #selector(quit), keyEquivalent: "q")
-        for item in menu.items { item.target = self }; status?.menu = menu
+        for item in menu.items { item.target = self }; menu.delegate = self; status?.menu = menu
         model.overlayChanged = { [weak self] in self?.updatePill() }
         model.showOnboarding = showWalkthrough
         model.start(); openWindow(); updatePill()
@@ -67,6 +67,10 @@ import QuartzCore
     }
     @objc private func settings() { model.page = .settings; openWindow() }
     @objc private func toggle() { model.toggle() }
+    /// The status menu names the current shortcut.
+    public func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.items.first { $0.action == #selector(toggle) }?.title = "Start / finish dictation (\(model.shortcut.name))"
+    }
     @objc private func quit() {
         if model.classes.isActive { model.page = model.classes.active?.isCall == true ? .calls : .classes; openWindow(); model.classes.notice = "Class recording is running. Stop it in the app before quitting."; return }
         if model.recording || model.finishing { model.notice = "Finish or cancel your recording before quitting."; updatePill(); return }

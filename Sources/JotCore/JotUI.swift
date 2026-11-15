@@ -114,6 +114,7 @@ struct Keycap: View {
     let text: String
     var body: some View {
         Text(text).font(.system(size: 11.5, weight: .semibold, design: .rounded))
+            .lineLimit(1).fixedSize()
             .foregroundStyle(Look.ink)
             .padding(.horizontal, 7).frame(minWidth: 24, minHeight: 22)
             .background(RoundedRectangle(cornerRadius: 6).fill(Look.card))

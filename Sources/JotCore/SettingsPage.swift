@@ -19,7 +19,11 @@ struct SettingsPage: View {
                     TimelineView(.periodic(from: .now, by: 2)) { _ in PermissionRows(model: model) }
                 }
                 group("Shortcuts", nil) {
-                    SettingRow(title: "Start and finish dictation", detail: "Tap the Globe (fn) key. Set System Settings › Keyboard › “Press 🌐 key to” to Do Nothing.") { Keycap(text: "🌐 Globe") }
+                    SettingRow(title: "Start and finish dictation", detail: model.shortcut.isGlobe
+                               ? "Tap the Globe (fn) key. Set System Settings › Keyboard › “Press 🌐 key to” to Do Nothing."
+                               : "\(model.shortcut.verb) \(model.shortcut.name) in any app.") {
+                        ShortcutRecorder(model: model)
+                    }
                     SettingRow(title: "Cancel", detail: "While recording.") { Keycap(text: "esc") }
                     SettingRow(title: "Hold Space to talk", detail: "In the apps below: hold Space for a moment, release to insert the raw transcript. A tap still types a space.") {
                         Toggle("", isOn: $model.spaceHold).labelsHidden().toggleStyle(.switch)
@@ -127,7 +131,7 @@ struct PermissionRows: View {
                     }
                 }
             }
-            SettingRow(title: "Accessibility", detail: "For the Globe shortcut and typing into other apps.") {
+            SettingRow(title: "Accessibility", detail: "For the \(model.shortcut.name) shortcut and typing into other apps.") {
                 HStack(spacing: 8) {
                     StatusPill(ok: ax, text: ax ? (model.hotkeysReady ? "Allowed" : "Allowed · restart Jot") : "Not yet")
                     if !ax { SoftButton(title: "Open Settings", symbol: "hand.raised") { model.requestAccessibility() } }
@@ -143,5 +147,61 @@ struct PermissionRows: View {
                 }
             }
         }
+    }
+}
+
+/// The dictation shortcut as keycaps. Record listens for the next key combination, or a lone tap of a modifier
+/// (fn picks Globe); esc stops listening.
+struct ShortcutRecorder: View {
+    @ObservedObject var model: AppModel
+    @State private var listening = false
+    @State private var monitor: Any?
+    @State private var tap = ModifierTap()
+    @State private var message: String?
+    @State private var rejected = false
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 6) {
+            HStack(spacing: 8) {
+                if listening {
+                    Text("Press the keys…").font(.system(size: 12, weight: .medium)).foregroundStyle(Look.accent).lineLimit(1).fixedSize()
+                    SoftButton(title: "Cancel", symbol: "xmark") { stop() }
+                } else {
+                    HStack(spacing: 3) { ForEach(model.shortcut.keys, id: \.self) { Keycap(text: $0) } }.fixedSize()
+                        .accessibilityElement().accessibilityLabel("Shortcut: \(model.shortcut.name)")
+                    SoftButton(title: "Record", symbol: "record.circle") { start() }
+                    if !model.shortcut.isGlobe { SoftButton(title: "Use Globe", symbol: "globe") { model.setShortcut(.globe); message = nil } }
+                }
+            }
+            if let message {
+                Text(message).font(.system(size: 11)).foregroundStyle(rejected ? Color.mtBad : Color.mtWarn)
+                    .multilineTextAlignment(.trailing).fixedSize(horizontal: false, vertical: true).frame(maxWidth: 280, alignment: .trailing)
+            }
+        }
+        .onDisappear { stop() }
+    }
+
+    private func start() {
+        message = nil; tap = ModifierTap(); listening = true; model.recordingShortcut = true
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in handle(event); return nil }
+    }
+    private func stop() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil; listening = false; model.recordingShortcut = false
+    }
+    private func handle(_ event: NSEvent) {
+        let code = Int64(event.keyCode), flags = event.cgEvent?.flags ?? []
+        if event.type == .keyDown {
+            tap.key()
+            let modifiers = flags.intersection(DictationShortcut.modifierMask)
+            if code == 53 && modifiers.isEmpty { return stop() }
+            offer(.combo(key: code, modifiers: modifiers))
+        } else if let info = DictationShortcut.modifierKeys[code] {
+            let held = flags.intersection(DictationShortcut.modifierMask.union(.maskSecondaryFn))
+            if tap.flags(code: code, down: flags.contains(info.flag), alone: held == info.flag) != nil { offer(code == 63 ? .globe : .modifier(code)) }
+        }
+    }
+    private func offer(_ shortcut: DictationShortcut) {
+        if let reason = shortcut.rejection { message = reason; rejected = true; return }   // keep listening
+        model.setShortcut(shortcut); message = shortcut.warning; rejected = false; stop()
     }
 }

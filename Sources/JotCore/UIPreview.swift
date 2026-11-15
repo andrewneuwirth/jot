@@ -64,12 +64,24 @@ import AppKit
         for step in 0..<5 {
             shots.append(("walkthrough-\(step + 1)", { AnyView(Onboarding(model: model, models: models, step: step)) }, NSSize(width: 640, height: 540)))
         }
+        // The same screens with a chosen shortcut instead of Globe.
+        let combo = DictationShortcut.combo(key: 49, modifiers: [.maskControl, .maskAlternate])
+        for page in [Page.dictation, .settings] {
+            shots.append(("\(page.rawValue)-shortcut", {
+                model.shortcut = combo; model.page = page; model.selection = library.history.first?.id
+                return AnyView(RootView(model: model, library: library, classes: classes))
+            }, window))
+        }
+        shots.append(("walkthrough-1-shortcut", { model.shortcut = combo; return AnyView(Onboarding(model: model, models: models, step: 0)) }, NSSize(width: 640, height: 540)))
+        shots.append(("walkthrough-4-shortcut", { model.shortcut = combo; return AnyView(Onboarding(model: model, models: models, step: 3)) }, NSSize(width: 640, height: 540)))
+        shots.append(("walkthrough-5-shortcut", { model.shortcut = .modifier(54); return AnyView(Onboarding(model: model, models: models, step: 4)) }, NSSize(width: 640, height: 540)))
         try? FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             for (name, make, size) in shots {
                 // Split views, menus and scroll views need a real window to lay out; it's never ordered on screen.
                 let w = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
                 w.appearance = NSAppearance(named: appearance)
+                model.shortcut = .globe
                 let host = NSHostingView(rootView: make())
                 w.contentView = host
                 host.layoutSubtreeIfNeeded()

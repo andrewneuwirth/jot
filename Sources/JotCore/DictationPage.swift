@@ -44,7 +44,7 @@ struct DictationPage: View {
                     Text(model.recording ? "Listening… \(formatDuration(model.seconds))" : (model.finishing ? "Finishing…" : "Talk instead of type, in any app"))
                         .font(.system(size: 16, weight: .semibold)).foregroundStyle(Look.ink).monospacedDigit()
                     HStack(spacing: 6) {
-                        Keycap(text: "🌐 Globe"); Text("start and finish").font(.system(size: 12)).foregroundStyle(Look.muted)
+                        ForEach(model.shortcut.keys, id: \.self) { Keycap(text: $0) }; Text("start and finish").font(.system(size: 12)).foregroundStyle(Look.muted)
                         Keycap(text: "esc").padding(.leading, 6); Text("cancel").font(.system(size: 12)).foregroundStyle(Look.muted)
                     }
                 }
