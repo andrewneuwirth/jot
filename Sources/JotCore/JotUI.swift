@@ -39,6 +39,7 @@ struct PrimaryButton: View {
     var body: some View {
         Button(action: action) {
             Label(title, systemImage: symbol)
+                .lineLimit(1).fixedSize()
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 16).frame(minHeight: 32)
@@ -61,10 +62,10 @@ struct SoftButton: View {
         Button(role: role, action: action) {
             Label(title, systemImage: symbol)
                 .font(.system(size: 12.5, weight: .medium))
+                .lineLimit(1).fixedSize()   // a squeezed row wraps the text instead of the button
                 .foregroundStyle(role == .destructive ? Color.mtBad : Look.ink)
                 .padding(.horizontal, 12).frame(minHeight: 28)
                 .background(Pill().fill(Look.fill))
-                .overlay(Pill().strokeBorder(Look.line))
                 .contentShape(Pill())
                 .opacity(disabled ? 0.45 : 1)
         }
@@ -135,7 +136,6 @@ struct SearchPill: View {
         }
         .padding(.horizontal, 12).frame(width: 260, height: 32)
         .background(Pill().fill(Look.fill))
-        .overlay(Pill().strokeBorder(Look.line))
     }
 }
 
@@ -274,7 +274,7 @@ struct Pill: InsettableShape {
     var inset: CGFloat = 0
     func path(in rect: CGRect) -> Path {
         let r = rect.insetBy(dx: inset, dy: inset)
-        return RoundedRectangle(cornerRadius: r.height / 2, style: .continuous).path(in: r)
+        return Capsule().path(in: r)   // a continuous rounded rect at half-height radius flattens the ends into lines
     }
     func inset(by amount: CGFloat) -> Pill { Pill(inset: inset + amount) }
 }

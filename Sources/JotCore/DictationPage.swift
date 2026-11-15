@@ -57,7 +57,7 @@ struct DictationPage: View {
                             Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold)).foregroundStyle(Look.muted)
                         }
                         .padding(.leading, 4).padding(.trailing, 10).frame(height: 30)
-                        .background(Pill().fill(Look.fill)).overlay(Pill().strokeBorder(Look.line))
+                        .background(Pill().fill(Look.fill))
                     }
                     .buttonStyle(.plain).help("Change the speech model")
                     HStack(spacing: 14) {
