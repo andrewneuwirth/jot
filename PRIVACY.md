@@ -69,7 +69,11 @@ files or user defaults. Clearing the key field removes the item.
   SHA-256 is checked before it's used). Nothing about you or your audio is sent.
 - **Apple speech assets**: macOS may download its own on-device speech model the first time it's needed.
 - **Cloud cleanup**, only if you set it up (above).
-- Nothing else. Jot does not check for updates or phone home.
+- **Update checks**: about once a day Jot asks `https://newitools.app/jot/appcast.xml` whether there is a new version,
+  using [Sparkle](https://sparkle-project.org). The request carries the app's version and your macOS version, and like
+  any web request the site sees your IP address. Updates are verified against a signing key built into the app before
+  they're installed. Turn automatic checks off in Settings › Updates.
+- Nothing else.
 
 ## Other local data
 

@@ -3,7 +3,7 @@ on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       # Jot builds against a Kit checkout next to it when there is one (see Package.swift).
       - uses: actions/checkout@v4

@@ -8,6 +8,8 @@ Dependencies: MacToolsKit (`../Kit` if present, else github.com/andrewneuwirth/m
 - `swift build && .build/debug/Jot --self-check` (pure logic, CI runs it) and `swift test`.
 - `.build/debug/Jot --ui-preview DIR` renders every page and walkthrough step, light and dark, from made-up data in an
   offscreen window. Look at the PNGs after any UI change. Never launch the app or record from a real microphone to test.
+- `./build.sh --release` signs with Developer ID (hardened runtime, timestamp, `Resources/Jot.entitlements` for the
+  microphone) and ignores `config.local.env`; then `../Kit/tools/release-app.sh build/Jot.app dist` notarizes and makes the DMG.
 
 ## Sources (`Sources/JotCore`)
 
