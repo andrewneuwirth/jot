@@ -30,7 +30,7 @@ public final class SystemAudioTap {
 
         let aggregate: [String: Any] = [
             kAudioAggregateDeviceNameKey: "Jot Call Capture",
-            kAudioAggregateDeviceUIDKey: "com.example.jot.call.\(UUID().uuidString)",
+            kAudioAggregateDeviceUIDKey: "app.newitools.jot.call.\(UUID().uuidString)",
             kAudioAggregateDeviceMainSubDeviceKey: micUID,
             kAudioAggregateDeviceIsPrivateKey: true,
             kAudioAggregateDeviceIsStackedKey: false,

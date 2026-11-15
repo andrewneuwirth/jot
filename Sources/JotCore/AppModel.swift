@@ -35,11 +35,13 @@ enum FloatingIconAppearance: String, CaseIterable, Identifiable {
     private var session = UUID()
     @Published var state = "Loading model…"
     @Published var ready = false
-    @Published var recording = false {
-        didSet { DistributedNotificationCenter.default().postNotificationName(Notification.Name("com.example.Jot.recording"), object: nil, userInfo: ["active": recording || finishing], deliverImmediately: true) }
-    }
-    @Published var finishing = false {
-        didSet { DistributedNotificationCenter.default().postNotificationName(Notification.Name("com.example.Jot.recording"), object: nil, userInfo: ["active": recording || finishing], deliverImmediately: true) }
+    @Published var recording = false { didSet { postRecordingState() } }
+    @Published var finishing = false { didSet { postRecordingState() } }
+    /// Lets other tools (a wake-word listener, a voice assistant) pause while Jot uses the microphone.
+    private func postRecordingState() {
+        for name in Migration.recordingNotifications {
+            DistributedNotificationCenter.default().postNotificationName(name, object: nil, userInfo: ["active": recording || finishing], deliverImmediately: true)
+        }
     }
     @Published var busy = false
     @Published var transcript = ""

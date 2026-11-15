@@ -3,6 +3,7 @@ import JotCore
 
 @main struct Main {
     @MainActor static func main() {
+        if CommandLine.arguments.contains("--self-check") { SelfCheck.run(); exit(0) }
         // Headless for other tools: no NSApplication, so no Dock icon, windows or effect on a running Jot.
         if let request = TranscribeCommand.parse(CommandLine.arguments) {
             Task {
@@ -15,6 +16,7 @@ import JotCore
             Task { await command(); exit(0) }
             dispatchMain()
         }
+        Migration.run()   // before anything reads settings
         launch()
     }
     @MainActor static func command() async {
