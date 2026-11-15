@@ -94,6 +94,11 @@ enum FloatingIconAppearance: String, CaseIterable, Identifiable {
     @Published var spaceHoldApps = UserDefaults.standard.string(forKey: "spaceHoldApps") ?? SpaceHold.defaultApps {
         didSet { UserDefaults.standard.set(spaceHoldApps, forKey: "spaceHoldApps") }
     }
+    /// Change it with `setShortcut`, which saves it; the UI preview assigns it directly so nothing is written.
+    @Published var shortcut = DictationShortcut(stored: UserDefaults.standard.string(forKey: DictationShortcut.defaultsKey))
+    /// The Settings or walkthrough recorder is listening for a new shortcut.
+    @Published var recordingShortcut = false
+    func setShortcut(_ next: DictationShortcut) { shortcut = next; UserDefaults.standard.set(next.stored, forKey: DictationShortcut.defaultsKey) }
     private var holdSession = false
     @Published var modelLoadMS: Double = 0
     @Published var previewStatus = "Apple on-device speech"
@@ -106,6 +111,8 @@ enum FloatingIconAppearance: String, CaseIterable, Identifiable {
         hotkeys.cancel = { [weak self] in self?.cancel() }
         hotkeys.isRecording = { [weak self] in self?.recording == true }
         hotkeys.holdToTalk = { [weak self] down in self?.holdToTalk(down) }
+        hotkeys.shortcut = { [weak self] in self?.shortcut ?? .globe }
+        hotkeys.suspended = { [weak self] in self?.recordingShortcut == true }
         // Only hold back Space when a dictation would really start; otherwise it types normally.
         hotkeys.spaceHoldAllowed = { [weak self] in
             guard let self, self.spaceHold, self.ready, !self.busy, !self.recording, !self.finishing, !self.classes.isActive,

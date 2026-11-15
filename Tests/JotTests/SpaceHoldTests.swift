@@ -70,4 +70,16 @@ final class SpaceHoldTests: XCTestCase {
         XCTAssertThrowsError(try XCTUnwrap(TranscribeCommand.parse(["Jot", "--transcribe", ""])).get())
         XCTAssertThrowsError(try XCTUnwrap(TranscribeCommand.parse(["Jot", "--transcribe", "--ultra"])).get())
     }
+
+    func testModifierTapNeedsALoneQuickPressWithNoKeyBetween() {
+        var t = ModifierTap(); let t0 = Date()
+        XCTAssertNil(t.flags(code: 54, down: true, alone: true, now: t0))
+        XCTAssertEqual(t.flags(code: 54, down: false, alone: false, now: t0 + 0.2), 54)
+        XCTAssertNil(t.flags(code: 54, down: true, alone: true, now: t0)); t.key()
+        XCTAssertNil(t.flags(code: 54, down: false, alone: false, now: t0 + 0.2), "⌘C must not count as a tap")
+        XCTAssertNil(t.flags(code: 54, down: true, alone: false, now: t0))
+        XCTAssertNil(t.flags(code: 54, down: false, alone: false, now: t0 + 0.2), "with ⇧ held it's a combination")
+        XCTAssertNil(t.flags(code: 54, down: true, alone: true, now: t0))
+        XCTAssertNil(t.flags(code: 54, down: false, alone: false, now: t0 + 0.8), "a long hold isn't a tap")
+    }
 }
