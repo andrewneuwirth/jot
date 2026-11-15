@@ -19,7 +19,8 @@ server, account, analytics, tracking, crash reporting or advertising.
 - **Record Class** and **Record Call**: audio is saved continuously to
   `~/Library/Application Support/Jot/Classes/<recording>/` and kept until you delete the recording (it goes to the Trash).
   Record Call also captures what your Mac plays (the other side of a call) through a private Core Audio tap that exists
-  only while recording. Recording people may require their consent where you live; tell them.
+  only while recording. Jot shows no consent notice by design: recording people may require their consent where you
+  live, so tell them.
 
 ## Transcription: who receives your audio
 

@@ -21,7 +21,9 @@ Dependencies: MacToolsKit (`../Kit` if present, else github.com/andrewneuwirth/m
 - `ApplePreview.swift`, `PreviewTranscript.swift`: Apple SpeechAnalyzer live text.
 - `ClassRecorder.swift`: Record Class / Record Call sessions (`kind`), 15-minute segments, crash recovery.
 - `SystemAudioTap.swift`: Core Audio process tap + private aggregate device for calls.
-- `TextInsertion.swift`, `SmartPaste.swift`, `Hotkeys.swift`: Accessibility insertion, keyboard tap (Globe, Esc, Space hold).
+- `TextInsertion.swift`, `SmartPaste.swift`, `Hotkeys.swift`: Accessibility insertion, keyboard tap (the dictation shortcut: Globe, a
+  lone modifier tap or a key combination, `DictationShortcut` in defaults key `dictationShortcut`, missing = Globe; Esc;
+  Space hold). The shortcut recorder is `ShortcutRecorder` in `SettingsPage.swift`.
 - `LocalCleanup.swift`: optional Ollama cleanup with meaning guards. `Library.swift`: notes/history JSON.
 - Views: `MainWindow.swift` (root + sidebar), `DictationPage`, `NotesPage`, `RecordingsPage`, `ModelsPage`,
   `SettingsPage`, `Onboarding`, `Overlay` (bubble), shared pieces in `JotUI.swift`, `UIPreview.swift`.
@@ -44,3 +46,5 @@ Dependencies: MacToolsKit (`../Kit` if present, else github.com/andrewneuwirth/m
 - Don't download large models in tests or CI; extend the fake backend instead.
 - Don't rewrite working capture or transcription logic to restyle it.
 - No real names, paths or emails in code, tests, demo data or docs.
+- Intentional, not to-dos: `jot://toggle` runs without a confirmation prompt, and Record Call shows no consent notice.
+  Don't add either.

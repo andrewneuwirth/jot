@@ -1,6 +1,6 @@
 # Jot
 
-Talk instead of type, on your Mac. Tap the Globe key, speak, tap again, and the words land where your cursor is.
+Talk instead of type, on your Mac. Tap the Globe key (or a shortcut you choose), speak, tap again, and the words land where your cursor is.
 Notes, class recordings and call recordings live in the same app. Every model runs on your Mac: no account, no server,
 no cloud transcription. SwiftUI and AppKit, macOS 26, Apple Silicon.
 
@@ -8,7 +8,8 @@ From [newi tools](https://newitools.app/jot/).
 
 ## Features
 
-- **Dictate into any app**: tap Globe (fn) to start and finish, Esc to cancel. Words appear live in the text box where
+- **Dictate into any app**: tap Globe (fn) to start and finish, Esc to cancel. No Globe key, or macOS uses it? Pick a key
+  combination (⌃⌥Space) or a lone tap of Right ⌘ / Right ⌥ in Settings › Shortcuts. Words appear live in the text box where
   the app allows it; otherwise Jot pastes when you stop. Everything is kept in **History**, so nothing you say is lost.
 - **Models you choose**, downloaded in the app: Parakeet Ultra (most accurate English), Parakeet v3 (25 European
   languages), Parakeet Realtime (fastest streaming), with Apple's on-device speech for live words. Download, cancel,
@@ -18,7 +19,7 @@ From [newi tools](https://newitools.app/jot/).
 - **Record Class**: hours of audio saved to disk as it goes (a crash loses at most a moment), with a live transcript and
   re-transcription later with your chosen model.
 - **Record Call**: your microphone plus what the Mac plays, so both sides of a FaceTime, Zoom or Meet call are in one
-  transcript. Tell the other side you're recording.
+  transcript. Jot shows no consent notice by design; telling the other side you're recording is up to you.
 - **Optional cleanup** of fillers and spoken corrections ("Tuesday, I mean Wednesday") with a local model in
   [Ollama](https://ollama.com). The original stays in History; quotes are kept verbatim.
 - Hold Space to talk in chosen apps, spelling rules, a floating bubble, Open at Login, and a first-launch walkthrough.
@@ -48,7 +49,7 @@ Microphone and Accessibility grants across rebuilds), otherwise ad hoc. To use y
 ## Permissions
 
 - **Microphone**: required, to hear you.
-- **Accessibility**: for the Globe shortcut and typing into other apps.
+- **Accessibility**: for the dictation shortcut and typing into other apps.
 - **System audio recording**: only for Record Call; macOS asks the first time.
 
 If tapping Globe opens the emoji picker or Apple's dictation, set System Settings › Keyboard › "Press 🌐 key to" to
@@ -58,7 +59,8 @@ If tapping Globe opens the emoji picker or Apple's dictation, set System Setting
 
 - `Jot --transcribe <file>` prints a raw Parakeet Ultra transcript of an audio file (wav, m4a, mp3, flac, caf, ogg,
   WebM/Opus) and exits; it never downloads and never opens a window.
-- `jot://toggle` starts or finishes a dictation.
+- `jot://toggle` starts or finishes a dictation. It asks for no confirmation, by design: it can only start or finish a
+  dictation, which shows the bubble and goes into History like any other.
 - While Jot records it posts the distributed notification `app.newitools.jot.recording` with `userInfo["active"]`
   (a Bool), so a wake-word listener can pause.
 - `Jot --prepare-model`, `Jot --benchmark <file> [--reference "<text>"]` for local measurements.
