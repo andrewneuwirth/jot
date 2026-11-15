@@ -1,45 +1,80 @@
 # Jot
 
-A local macOS dictation and notes app. Native SwiftUI/AppKit, NVIDIA Parakeet Realtime EOU 120M through FluidAudio/Core ML, blue accents, menu-bar recording. No server, account, analytics, or cloud transcription.
+Talk instead of type, on your Mac. Tap the Globe key, speak, tap again, and the words land where your cursor is.
+Notes, class recordings and call recordings live in the same app. Every model runs on your Mac: no account, no server,
+no cloud transcription. SwiftUI and AppKit, macOS 26, Apple Silicon.
 
-## Use
+From [newi tools](https://newitools.app/jot/).
 
-- Globe: tap to start, tap again to finish. Escape cancels.
-- Space (ChatGPT, Claude, Terminal, Ghostty, iTerm; edit in Settings → Controls): hold ≥ 0.35 s to talk, release to insert the raw transcript (no cleanup). A tap types a space; Space with modifiers is untouched.
-- Notes: create, edit, pin, organize in folders, search, export. Formatting toolbar inserts Markdown.
-- Dictation History: recover, copy, save as a note, retry/play retained recordings.
-- Settings: actual selected model/mode, microphone, permissions, Open at Login, vocabulary, local storage and real benchmarks.
+## Features
 
-Microphone access is required to record. Accessibility access is required for global shortcuts and insertion into other apps. Enable these for **Jot** in macOS Privacy & Security, then click Refresh in Settings.
+- **Dictate into any app**: tap Globe (fn) to start and finish, Esc to cancel. Words appear live in the text box where
+  the app allows it; otherwise Jot pastes when you stop. Everything is kept in **History**, so nothing you say is lost.
+- **Models you choose**, downloaded in the app: Parakeet Ultra (most accurate English), Parakeet v3 (25 European
+  languages), Parakeet Realtime (fastest streaming), with Apple's on-device speech for live words. Download, cancel,
+  switch and delete them on the **Models** page.
+- **Notes** with folders, pins, search and Markdown shortcuts. Dictate straight into a note, or save any dictation or
+  recording as one.
+- **Record Class**: hours of audio saved to disk as it goes (a crash loses at most a moment), with a live transcript and
+  re-transcription later with your chosen model.
+- **Record Call**: your microphone plus what the Mac plays, so both sides of a FaceTime, Zoom or Meet call are in one
+  transcript. Tell the other side you're recording.
+- **Optional cleanup** of fillers and spoken corrections ("Tuesday, I mean Wednesday") with a local model in
+  [Ollama](https://ollama.com). The original stays in History; quotes are kept verbatim.
+- Hold Space to talk in chosen apps, spelling rules, a floating bubble, Open at Login, and a first-launch walkthrough.
 
-Live updates use the target app's Accessibility text interface and stop if focus, selection or contents change. Unsupported fields use a live overlay and final paste when the original focus remains unchanged. Otherwise the transcript stays in History and can be copied manually. No Enter key is sent. Rich-text fields may normalize formatting when their AX value is replaced; use final-only insertion when preserving complex formatting matters.
+## Screenshots
 
-## Models and measurements
+_Coming soon._ `Jot --ui-preview DIR` renders every page with made-up data.
 
-Selected default: `FluidInference/parakeet-ultra-coreml` for final transcription of the original microphone audio, with Apple SpeechAnalyzer / SpeechTranscriber providing local live previews. The small EOU model is not loaded in Ultra mode; legacy 160/320 ms modes remain selectable. Initial download is online; inference is local. Assets are cached under `~/Library/Application Support/Jot/Models`. Chunk duration is not end-to-end latency or a speed claim.
+## Build from source
 
-Benchmarks show real audio duration, processing time, realtime multiplier, flush latency, hardware and transcript. WER is computed only with an explicit reference. Model load is excluded. A file benchmark is not a microphone latency test. Actual dictation history separately records stop-to-finish duration.
+Needs Xcode 26 or later (Swift 6.2 tools) on macOS 26 and an Apple Silicon Mac.
 
+```sh
+git clone <this repo> Jot && cd Jot
+swift build && .build/debug/Jot --self-check   # should end with "self-check ok"
+swift test                                      # unit tests
+./build.sh                                      # makes build/Jot.app
+open build/Jot.app
 ```
-swift test
-./build.sh                     # release bundle, Apple Development signature
-./build.sh --install           # install and open (quit Jot first)
-JOT_ADHOC=1 ./build.sh          # local development fallback without signing key
-.build/release/Jot --prepare-model
-.build/release/Jot --benchmark Tests/Fixtures/jfk.wav --reference "And so my fellow Americans ask not what your country can do for you ask what you can do for your country"
-.build/release/Jot --benchmark Tests/Fixtures/jfk.wav --320
-/Applications/Jot.app/Contents/MacOS/Jot --transcribe clip.m4a   # raw transcript on stdout (wav/m4a/mp3/flac/caf/ogg/webm-opus), exit 0; error on stderr, exit 1
-```
 
-Swift 6.2+ and macOS 26+ on Apple Silicon. Dependency revision is pinned in Package.swift and Package.resolved.
+Jot uses MacToolsKit from [mac-tools-kit](https://github.com/andrewneuwirth/mac-tools-kit) (SwiftPM fetches it, or uses
+a checkout at `../Kit`) and [FluidAudio](https://github.com/FluidInference/FluidAudio) for Parakeet on Core ML, pinned in
+`Package.swift`. `build.sh` signs with your Apple Development identity if you have one (a stable signature keeps the
+Microphone and Accessibility grants across rebuilds), otherwise ad hoc. To use your own bundle id or signing identity, copy
+`config.example.env` to `config.local.env` and edit it.
 
-## Privacy and storage
+## Permissions
 
-Notes, transcripts, spelling rules and measurements: `~/Library/Application Support/Jot/library.json`, atomically saved. Recovery audio: `Recordings/`. Successful audio is deleted by default; failures and cancellations retain audio. Optional successful audio retention is off by default. Export through the UI; backing up this folder backs up the library. No OpenWhispr data is imported or deleted.
+- **Microphone**: required, to hear you.
+- **Accessibility**: for the Globe shortcut and typing into other apps.
+- **System audio recording**: only for Record Call; macOS asks the first time.
 
-## License and attribution
+If tapping Globe opens the emoji picker or Apple's dictation, set System Settings › Keyboard › "Press 🌐 key to" to
+**Do Nothing**.
 
-Jot code: MIT (LICENSE). FluidAudio has its own Apache-2.0 license. NVIDIA's model and FluidInference's conversion retain their respective license/model terms, linked from Settings. Model weights are downloaded, not checked into this repo. The `jfk.wav` benchmark fixture comes from https://github.com/ggml-org/whisper.cpp/blob/master/samples/jfk.wav and contains an excerpt of President Kennedy's public inaugural address. It is a short smoke test, not a general accuracy evaluation.
+## For other tools
 
-Part of the Mac Tools family: its accent, status colours, glass sidebar, Open at Login and icon plate come
-from `../Kit` (MacToolsKit), so build it with Kit cloned beside it.
+- `Jot --transcribe <file>` prints a raw Parakeet Ultra transcript of an audio file (wav, m4a, mp3, flac, caf, ogg,
+  WebM/Opus) and exits; it never downloads and never opens a window.
+- `jot://toggle` starts or finishes a dictation.
+- While Jot records it posts the distributed notification `app.newitools.jot.recording` with `userInfo["active"]`
+  (a Bool), so a wake-word listener can pause.
+- `Jot --prepare-model`, `Jot --benchmark <file> [--reference "<text>"]` for local measurements.
+
+## Privacy
+
+Audio and transcripts never leave your Mac. The only network requests are model downloads from Hugging Face (and macOS
+fetching its own speech assets). Full policy: [PRIVACY.md](PRIVACY.md).
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md). Security issues: [SECURITY.md](SECURITY.md).
+
+## License
+
+[MIT](LICENSE). FluidAudio is Apache-2.0. The Parakeet models (NVIDIA, converted to Core ML by FluidInference) keep their
+own licenses, linked from each model card. Model weights are downloaded, never checked in. `Tests/Fixtures/jfk.wav` is a
+public-domain excerpt of a 1961 inaugural address, from the [whisper.cpp](https://github.com/ggml-org/whisper.cpp)
+samples, used as a short smoke test.
