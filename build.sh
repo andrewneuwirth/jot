@@ -32,6 +32,9 @@ if [[ "${JOT_ADHOC:-0}" == "1" || -z "$IDENTITY" ]]; then
     IDENTITY="-"
 fi
 codesign --force --sign "$IDENTITY" --timestamp=none "$APP/Contents/Frameworks/llama.framework"
+# Sparkle (updates): embedded and its helpers signed inside-out before the app, see Kit's docs/updates.md.
+KIT=../Kit; [[ -d "$KIT" ]] || KIT=.build/checkouts/mac-tools-kit
+"$KIT/tools/embed-sparkle.sh" "$APP" "$IDENTITY"
 codesign --force --sign "$IDENTITY" --timestamp=none "$APP"
 
 if [[ "${1:-}" == "--install" ]]; then

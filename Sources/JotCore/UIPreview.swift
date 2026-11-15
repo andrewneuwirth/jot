@@ -78,6 +78,7 @@ import AppKit
         // The cleanup section (below the fold on its pages): the card downloaded and not, and Settings with each route.
         let fresh = ModelStore(root: temp.appendingPathComponent("Empty"))
         func panel(_ view: some View) -> AnyView { AnyView(VStack(alignment: .leading) { view }.padding(22).frame(width: 860, alignment: .topLeading).frame(maxHeight: .infinity, alignment: .top).background(Look.panel)) }
+        shots.append(("settings-updates", { panel(Card(padding: 14) { VStack(alignment: .leading, spacing: 4) { UpdateSettings() } }) }, NSSize(width: 860, height: 200)))
         shots.append(("models-cleanup", { model.cleanupProvider = nil; return panel(CleanupCard(model: model, models: models)) }, NSSize(width: 860, height: 260)))
         shots.append(("models-cleanup-download", { model.cleanupProvider = nil; return panel(CleanupCard(model: model, models: fresh)) }, NSSize(width: 860, height: 260)))
         shots.append(("settings-cleanup", { model.cleanupProvider = nil; return panel(Card(padding: 14) { CleanupSettings(model: model, models: models) }) }, NSSize(width: 860, height: 230)))

@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import QuartzCore
+import MacToolsUpdates
 
 @MainActor public final class JotApplication: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuDelegate {
     private let model = AppModel()
@@ -34,6 +35,7 @@ import QuartzCore
         model.overlayChanged = { [weak self] in self?.updatePill() }
         model.showOnboarding = showWalkthrough
         model.start(); openWindow(); updatePill()
+        AppUpdater.start()
         Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             guard let self else { return }
             let diagnostic: [String: Any] = ["state": self.model.state, "window": self.window.map { NSStringFromRect($0.frame) } ?? "none", "visible": self.window?.isVisible ?? false, "page": self.model.page.rawValue, "shortcuts": self.model.hotkeysReady, "recording": self.model.recording]
@@ -45,6 +47,7 @@ import QuartzCore
         let menu = NSMenu(); let app = NSMenuItem(); menu.addItem(app)
         let appMenu = NSMenu(); app.submenu = appMenu
         appMenu.addItem(withTitle: "About Jot", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        appMenu.addItem(AppUpdater.shared.menuItem())
         let settings = appMenu.addItem(withTitle: "Settings…", action: #selector(settings), keyEquivalent: ","); settings.target = self
         appMenu.addItem(.separator()); appMenu.addItem(withTitle: "Hide Jot", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         appMenu.addItem(withTitle: "Quit Jot", action: #selector(quit), keyEquivalent: "q").target = self

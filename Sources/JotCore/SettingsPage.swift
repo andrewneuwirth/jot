@@ -2,6 +2,7 @@ import SwiftUI
 import AppKit
 import AVFoundation
 import MacToolsKit
+import MacToolsUpdates
 
 struct SettingsPage: View {
     @ObservedObject var model: AppModel
@@ -73,6 +74,9 @@ struct SettingsPage: View {
                     SettingRow(title: "Your library", detail: "~/Library/Application Support/Jot: notes, history, recordings and models.") {
                         SoftButton(title: "Show in Finder", symbol: "folder") { NSWorkspace.shared.open(JotPaths.root) }
                     }
+                }
+                group("Updates", nil) {
+                    UpdateSettings()
                 }
                 group("Benchmarks", "Measured on this Mac. File benchmarks exclude model loading and aren't live microphone latency.") {
                     SettingRow(title: SpeechEngine.hardware(), detail: medianFinish) {
@@ -261,5 +265,21 @@ struct CleanupSettings: View {
         guard let p = model.cleanupProvider else { return }
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed != (Keychain.get(p.rawValue) ?? "") { Keychain.set(trimmed, for: p.rawValue) }
+    }
+}
+
+/// Sparkle's switches, the version and when it last checked, and Check Now (Kit's AppUpdater).
+struct UpdateSettings: View {
+    @ObservedObject private var updates = AppUpdater.shared
+    var body: some View {
+        SettingRow(title: "Check for updates automatically", detail: nil) {
+            Toggle("", isOn: $updates.automaticallyChecks).labelsHidden().toggleStyle(.switch)
+        }
+        SettingRow(title: "Download and install automatically", detail: nil) {
+            Toggle("", isOn: $updates.automaticallyDownloads).labelsHidden().toggleStyle(.switch).disabled(!updates.automaticallyChecks)
+        }
+        SettingRow(title: "Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "–")", detail: updates.lastCheckedText) {
+            SoftButton(title: "Check Now", symbol: "arrow.clockwise", disabled: !updates.canCheck) { updates.checkNow() }
+        }
     }
 }
