@@ -7,7 +7,11 @@ import QuartzCore
     private var window: NSWindow?
     private var pill: NSPanel?
     private var status: NSStatusItem?
-    private var bubbleVisible = UserDefaults.standard.object(forKey: "bubbleVisible") as? Bool ?? true
+    /// Read from defaults each time, so the Settings switch, the bubble's Hide and the menu item stay in step.
+    private var bubbleVisible: Bool {
+        get { UserDefaults.standard.object(forKey: "bubbleVisible") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "bubbleVisible") }
+    }
     private var bubbleAnchor: CGPoint?
     private var dragAnchor: CGPoint?
     private var pillExpanded = false

@@ -5,6 +5,7 @@ import MacToolsKit
 
 struct SettingsPage: View {
     @ObservedObject var model: AppModel
+    @AppStorage("bubbleVisible") private var showBubble = true
     @ObservedObject var library: Library
     @State private var login = LoginItem.isEnabled
     var body: some View {
@@ -38,9 +39,15 @@ struct SettingsPage: View {
                     SettingRow(title: "Type as I speak", detail: "Words appear in the text box live where the app allows it; otherwise Jot pastes when you stop.") {
                         Toggle("", isOn: $model.liveInsertion).labelsHidden().toggleStyle(.switch)
                     }
-                    SettingRow(title: "Floating bubble", detail: "The small button in the corner of the screen. Right-click it to hide it.") {
-                        Picker("", selection: $model.floatingIconAppearance) { ForEach(FloatingIconAppearance.allCases) { Text($0.title).tag($0) } }
-                            .labelsHidden().pickerStyle(.segmented).frame(width: 200)
+                    SettingRow(title: "Floating bubble", detail: "The small button in the corner of the screen. It still appears while you dictate.") {
+                        HStack(spacing: 12) {
+                            if showBubble {
+                                Picker("", selection: $model.floatingIconAppearance) { ForEach(FloatingIconAppearance.allCases) { Text($0.title).tag($0) } }
+                                    .labelsHidden().pickerStyle(.segmented).frame(width: 200)
+                            }
+                            Toggle("Show", isOn: $showBubble).toggleStyle(.switch).labelsHidden()
+                                .onChange(of: showBubble) { _, _ in model.overlayChanged?() }
+                        }
                     }
                     SettingRow(title: "Spelling rules", detail: "One per line: spoken phrase = spelling. Example: eye phone = iPhone") { EmptyView() }
                     TextEditor(text: $library.vocabulary).font(.system(size: 12, design: .monospaced)).frame(height: 70)
