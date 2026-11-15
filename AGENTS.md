@@ -1,7 +1,7 @@
 # Jot: notes for agents and contributors
 
 Local dictation, notes, class and call recording for macOS 26 on Apple Silicon. SwiftUI + AppKit, Swift 5 mode.
-Dependencies: MacToolsKit (`../Kit` if present, else github.com/andrewneuwirth/mac-tools-kit) and FluidAudio (pinned).
+Dependencies: MacToolsKit (`../Kit` if present, else github.com/andrewneuwirth/mac-tools-kit), FluidAudio (pinned) and llama.cpp's prebuilt `llama.xcframework` (binary target, pinned by checksum; `build.sh` copies it into Contents/Frameworks).
 
 ## Check your work
 
@@ -24,7 +24,11 @@ Dependencies: MacToolsKit (`../Kit` if present, else github.com/andrewneuwirth/m
 - `TextInsertion.swift`, `SmartPaste.swift`, `Hotkeys.swift`: Accessibility insertion, keyboard tap (the dictation shortcut: Globe, a
   lone modifier tap or a key combination, `DictationShortcut` in defaults key `dictationShortcut`, missing = Globe; Esc;
   Space hold). The shortcut recorder is `ShortcutRecorder` in `SettingsPage.swift`.
-- `LocalCleanup.swift`: optional Ollama cleanup with meaning guards. `Library.swift`: notes/history JSON.
+- `LocalCleanup.swift`: dictation cleanup. Local: `CleanupModel` (Qwen3 4B Instruct GGUF, SHA-256 pinned, downloaded by
+  `ModelStore.downloadCleanup`) run in-process by llama.cpp (`llama` binary target, prefix KV cache, kept loaded).
+  Cloud: `CloudProvider` (Groq, OpenAI, Anthropic, Gemini) with the user's key in `Keychain` (service
+  `app.newitools.Jot.cleanup`). Both pass the `accepts` meaning guard; quotes bypass. Measure with
+  `JOT_CLEANUP_MODEL=/path/model.gguf swift test --filter testLocalModelSamples`. `Library.swift`: notes/history JSON.
 - Views: `MainWindow.swift` (root + sidebar), `DictationPage`, `NotesPage`, `RecordingsPage`, `ModelsPage`,
   `SettingsPage`, `Onboarding`, `Overlay` (bubble), shared pieces in `JotUI.swift`, `UIPreview.swift`.
 - `Migration.swift`, `SelfCheck.swift`.

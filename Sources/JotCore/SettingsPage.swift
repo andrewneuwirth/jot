@@ -58,7 +58,10 @@ struct SettingsPage: View {
                         .scrollContentBackground(.hidden).padding(6)
                         .background(RoundedRectangle(cornerRadius: MT.Radius.control).fill(Look.fill))
                 }
-                group("Privacy and storage", "Everything stays on this Mac. No account, analytics or cloud transcription.") {
+                group("Cleanup", "Removes ums, stutters and spoken corrections after transcription. The original stays in History.") {
+                    CleanupSettings(model: model, models: model.models)
+                }
+                group("Privacy and storage", model.cleanupProvider == nil ? "Everything stays on this Mac. No account, analytics or cloud transcription." : "Audio and speech recognition stay on this Mac. Cloud cleanup sends only the finished transcript text to \(model.cleanupProvider!.title).") {
                     SettingRow(title: "Open at Login", detail: nil) {
                         Toggle("", isOn: $login).labelsHidden().toggleStyle(.switch).onChange(of: login) { _, on in
                             if !LoginItem.set(on) { model.notice = "macOS didn't allow Open at Login."; login = LoginItem.isEnabled }
@@ -203,5 +206,60 @@ struct ShortcutRecorder: View {
     private func offer(_ shortcut: DictationShortcut) {
         if let reason = shortcut.rejection { message = reason; rejected = true; return }   // keep listening
         model.setShortcut(shortcut); message = shortcut.warning; rejected = false; stop()
+    }
+}
+
+/// Local model or the user's own cloud key. The key lives in the Keychain, never in defaults.
+struct CleanupSettings: View {
+    @ObservedObject var model: AppModel
+    @ObservedObject var models: ModelStore
+    @State private var key = ""
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) { rows }
+            .onAppear(perform: loadKey)
+            .onChange(of: model.cleanupEnabled) { _, _ in model.cleanupChanged() }
+            .onChange(of: model.cleanupProvider) { _, _ in model.cleanupChanged() }
+            .onChange(of: model.cleanupCloudModel) { _, _ in model.persistPreferences() }
+    }
+    @ViewBuilder private var rows: some View {
+        SettingRow(title: "Clean up dictation", detail: "Off: Jot types exactly what you said. Hold-to-talk always skips cleanup.") {
+            Toggle("", isOn: $model.cleanupEnabled).labelsHidden().toggleStyle(.switch)
+        }
+        SettingRow(title: "Runs on", detail: model.cleanupProvider == nil
+                   ? (models.cleanupReady ? "\(CleanupModel.name), on this Mac. Nothing leaves it." : "Download the cleanup model on the Models page. Until then dictation is typed as spoken.")
+                   : "Your \(model.cleanupProvider!.title) API key. Only the finished transcript text is sent to \(model.cleanupProvider!.host), never audio; the key stays in your Keychain.") {
+            Picker("", selection: Binding(get: { model.cleanupProvider == nil ? "local" : "cloud" },
+                                          set: { model.cleanupProvider = $0 == "local" ? nil : (model.cleanupProvider ?? .groq); model.cleanupCloudModel = ""; loadKey() })) {
+                Text("This Mac").tag("local"); Text("Cloud").tag("cloud")
+            }
+            .labelsHidden().pickerStyle(.segmented).frame(width: 180)
+        }
+        if model.cleanupProvider == nil, !models.cleanupReady {
+            HStack { Spacer(); SoftButton(title: "Open Models", symbol: "square.stack.3d.up") { model.page = .models } }
+        }
+        if let provider = model.cleanupProvider {
+            SettingRow(title: "Provider", detail: nil) {
+                Picker("", selection: Binding(get: { provider }, set: { model.cleanupProvider = $0; model.cleanupCloudModel = ""; loadKey() })) {
+                    ForEach(CloudProvider.allCases) { Text($0.title).tag($0) }
+                }
+                .labelsHidden().frame(width: 180)
+            }
+            SettingRow(title: "API key", detail: nil) {
+                HStack(spacing: 8) {
+                    Link(destination: provider.keysPage) { Text("Get a key").font(.system(size: 11.5)) }
+                    SecureField("Paste your key", text: $key).textFieldStyle(.roundedBorder).frame(width: 220)
+                        .onSubmit { saveKey() }.onChange(of: key) { _, _ in saveKey() }
+                }
+            }
+            SettingRow(title: "Model", detail: "Leave empty for \(provider.defaultModel), a fast, low-cost model.") {
+                TextField(provider.defaultModel, text: $model.cleanupCloudModel).textFieldStyle(.roundedBorder).frame(width: 220)
+            }
+        }
+    }
+    private func loadKey() { key = model.cleanupProvider.flatMap { Keychain.get($0.rawValue) } ?? "" }
+    private func saveKey() {
+        guard let p = model.cleanupProvider else { return }
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed != (Keychain.get(p.rawValue) ?? "") { Keychain.set(trimmed, for: p.rawValue) }
     }
 }

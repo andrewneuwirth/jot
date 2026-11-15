@@ -26,7 +26,7 @@ import AppKit
         }
         var cleaned = dictation("Can we move the team sync to Thursday at four thirty? I'll send the notes right after.", 4, 7.2, "Mail")
         cleaned.originalText = "Um can we move the team sync to Wednesday, I mean Thursday at four thirty? I'll send the notes right after."
-        cleaned.cleanupStatus = "Cleaned locally"; cleaned.cleanupMS = 310
+        cleaned.cleanupStatus = "Cleaned locally"; cleaned.cleanupMS = 160
         library.history = [
             cleaned,
             dictation("Thanks for the quick turnaround, this looks great. Let's ship it on Monday.", 22, 5.1, "Messages"),
@@ -48,9 +48,9 @@ import AppKit
             session("Call · Weekly check-in", call: true, hours: 50, seconds: 1_210, "Quick update on the launch checklist…"),
         ])
         let models = ModelStore(root: temp.appendingPathComponent("Models"))
-        models.preview(ready: ["parakeet-ultra", "parakeet-eou-160"], progress: ["parakeet-v3": 0.42])
+        models.preview(ready: ["parakeet-ultra", "parakeet-eou-160"], progress: ["parakeet-v3": 0.42], cleanup: true)
         let model = AppModel(library: library, classes: classes, models: models)
-        model.mode = .ultra; model.ready = true; model.state = "Ready"; model.cleanupStatus = "Qwen 3.5 4B · ready locally"
+        model.mode = .ultra; model.ready = true; model.state = "Ready"; model.cleanupStatus = "Cleaned locally · 160 ms"; model.cleanupProvider = nil
 
         var shots: [(String, () -> AnyView, NSSize)] = []
         let window = NSSize(width: 1240, height: 800)
@@ -75,13 +75,20 @@ import AppKit
         shots.append(("walkthrough-1-shortcut", { model.shortcut = combo; return AnyView(Onboarding(model: model, models: models, step: 0)) }, NSSize(width: 640, height: 540)))
         shots.append(("walkthrough-4-shortcut", { model.shortcut = combo; return AnyView(Onboarding(model: model, models: models, step: 3)) }, NSSize(width: 640, height: 540)))
         shots.append(("walkthrough-5-shortcut", { model.shortcut = .modifier(54); return AnyView(Onboarding(model: model, models: models, step: 4)) }, NSSize(width: 640, height: 540)))
+        // The cleanup section (below the fold on its pages): the card downloaded and not, and Settings with each route.
+        let fresh = ModelStore(root: temp.appendingPathComponent("Empty"))
+        func panel(_ view: some View) -> AnyView { AnyView(VStack(alignment: .leading) { view }.padding(22).frame(width: 860, alignment: .topLeading).frame(maxHeight: .infinity, alignment: .top).background(Look.panel)) }
+        shots.append(("models-cleanup", { model.cleanupProvider = nil; return panel(CleanupCard(model: model, models: models)) }, NSSize(width: 860, height: 260)))
+        shots.append(("models-cleanup-download", { model.cleanupProvider = nil; return panel(CleanupCard(model: model, models: fresh)) }, NSSize(width: 860, height: 260)))
+        shots.append(("settings-cleanup", { model.cleanupProvider = nil; return panel(Card(padding: 14) { CleanupSettings(model: model, models: models) }) }, NSSize(width: 860, height: 230)))
+        shots.append(("settings-cleanup-cloud", { model.cleanupProvider = .groq; return panel(Card(padding: 14) { CleanupSettings(model: model, models: models) }) }, NSSize(width: 860, height: 380)))
         try? FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             for (name, make, size) in shots {
                 // Split views, menus and scroll views need a real window to lay out; it's never ordered on screen.
                 let w = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
                 w.appearance = NSAppearance(named: appearance)
-                model.shortcut = .globe
+                model.shortcut = .globe; model.cleanupProvider = nil
                 let host = NSHostingView(rootView: make())
                 w.contentView = host
                 host.layoutSubtreeIfNeeded()

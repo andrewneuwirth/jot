@@ -20,8 +20,11 @@ From [newi tools](https://newitools.app/jot/).
   re-transcription later with your chosen model.
 - **Record Call**: your microphone plus what the Mac plays, so both sides of a FaceTime, Zoom or Meet call are in one
   transcript. Jot shows no consent notice by design; telling the other side you're recording is up to you.
-- **Optional cleanup** of fillers and spoken corrections ("Tuesday, I mean Wednesday") with a local model in
-  [Ollama](https://ollama.com). The original stays in History; quotes are kept verbatim.
+- **Cleanup** of fillers and spoken corrections ("Tuesday, I mean Wednesday" becomes "Wednesday") with a built-in model
+  (Qwen3 4B Instruct, 2.5 GB, run by [llama.cpp](https://github.com/ggml-org/llama.cpp) on the GPU, about 0.15 s per
+  sentence). Download it from the Models page or the walkthrough; it's on by default once downloaded, and without it Jot
+  types exactly what you said. Or use your own OpenAI, Anthropic, Groq or Gemini API key instead (Settings › Cleanup).
+  The original stays in History; quotes are kept verbatim.
 - Hold Space to talk in chosen apps, spelling rules, a floating bubble, Open at Login, and a first-launch walkthrough.
 
 ## Screenshots

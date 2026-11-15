@@ -15,6 +15,10 @@ APP="build/Jot.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/Jot "$APP/Contents/MacOS/Jot"
+# llama.cpp (the cleanup model's runtime) is a framework: it goes in Contents/Frameworks, found through this rpath.
+mkdir -p "$APP/Contents/Frameworks"
+ditto .build/release/llama.framework "$APP/Contents/Frameworks/llama.framework"
+install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/Jot"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE_ID" "$APP/Contents/Info.plist"
 [[ -z "$PREVIOUS_BUNDLE_ID" ]] || /usr/libexec/PlistBuddy -c "Add :JotPreviousBundleID string $PREVIOUS_BUNDLE_ID" "$APP/Contents/Info.plist"
@@ -27,6 +31,7 @@ if [[ "${JOT_ADHOC:-0}" == "1" || -z "$IDENTITY" ]]; then
     echo "==> Ad-hoc signing (Microphone and Accessibility must be granted again after each build)"
     IDENTITY="-"
 fi
+codesign --force --sign "$IDENTITY" --timestamp=none "$APP/Contents/Frameworks/llama.framework"
 codesign --force --sign "$IDENTITY" --timestamp=none "$APP"
 
 if [[ "${1:-}" == "--install" ]]; then

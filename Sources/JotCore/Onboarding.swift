@@ -98,10 +98,39 @@ struct Onboarding: View {
     private var pickModel: some View {
         let recommended = SpeechCatalog.model(for: .ultra), small = SpeechCatalog.model(for: .fast)
         return VStack(alignment: .leading, spacing: 12) {
-            title("Pick a speech model", "Downloaded once from Hugging Face, then everything is transcribed on this Mac.")
+            title("Pick a speech model", "Downloaded once from Hugging Face, then everything is transcribed and cleaned up on this Mac.")
             choice(recommended)
             choice(small)
+            cleanupChoice
             Text("More models, including 25 languages, are on the Models page.").font(.system(size: 12)).foregroundStyle(Look.muted)
+        }
+    }
+
+    /// Optional: the cleanup model. Without it dictation is typed exactly as spoken.
+    private var cleanupChoice: some View {
+        Card(padding: 14) {
+            HStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: 10).fill(LinearGradient(colors: [Color(hue: 0.75, saturation: 0.35, brightness: 0.95), Color(hue: 0.72, saturation: 0.6, brightness: 0.7)], startPoint: .top, endPoint: .bottom))
+                    .frame(width: 40, height: 40)
+                    .overlay(Image(systemName: "sparkles").font(.system(size: 17, weight: .semibold)).foregroundStyle(.white))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text("Cleanup").font(.system(size: 14, weight: .semibold)).foregroundStyle(Look.ink)
+                        Chip(text: "Optional")
+                    }
+                    Text("\(ByteCountFormatter.string(fromByteCount: CleanupModel.bytes, countStyle: .file)) · removes ums and “I mean” corrections").font(.system(size: 12)).foregroundStyle(Look.muted)
+                }
+                Spacer()
+                if let p = models.cleanupProgress {
+                    ProgressBar(value: p).frame(width: 90)
+                    Text("\(Int(p * 100))%").font(.system(size: 12, weight: .medium)).monospacedDigit().frame(width: 36)
+                } else if models.cleanupReady {
+                    StatusPill(ok: true, text: "Ready")
+                } else {
+                    SoftButton(title: "Download", symbol: "arrow.down.circle") { models.downloadCleanup { model.cleanupChanged() } }
+                }
+            }
         }
     }
 

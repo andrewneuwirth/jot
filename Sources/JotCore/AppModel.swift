@@ -41,8 +41,12 @@ enum FloatingIconAppearance: String, CaseIterable, Identifiable {
     public let classes: ClassRecorder
     public let models: ModelStore
     private let cleanup = LocalCleanup()
-    @Published var cleanupEnabled = UserDefaults.standard.object(forKey: "cleanupEnabled") as? Bool ?? false   // needs Ollama, so opt-in
-    @Published var cleanupStatus = "Qwen 3.5 4B · local"
+    /// On by default; it only runs once the cleanup model is downloaded (or a cloud key is set), otherwise the raw text is pasted.
+    @Published var cleanupEnabled = UserDefaults.standard.object(forKey: "cleanupEnabled") as? Bool ?? true
+    /// nil: the built-in local model. Otherwise the user's own key with this provider.
+    @Published var cleanupProvider = CloudProvider(rawValue: UserDefaults.standard.string(forKey: "cleanupProvider") ?? "")
+    @Published var cleanupCloudModel = UserDefaults.standard.string(forKey: "cleanupCloudModel") ?? ""   // empty: the provider's default
+    @Published var cleanupStatus = ""   // the last cleanup's outcome
     private var originalTranscript: String?
     private var cleanupResult: CleanupResult?
     private var finishingDestinationCaptured = false
@@ -139,7 +143,20 @@ enum FloatingIconAppearance: String, CaseIterable, Identifiable {
         library.recoverInterruptedRecordings(); refreshPermissions()
         // A model that isn't on this Mac yet waits for the Models page or the walkthrough instead of a silent download.
         guard models.isReady(mode) else { state = "Choose a model"; return }
-        Task { await loadModel(); if cleanupEnabled { cleanupStatus = await cleanup.warm() ? "Qwen 3.5 4B · ready locally" : "Start Ollama to enable cleanup" } } }
+        Task { await loadModel(); cleanupChanged() } }
+    /// Where cleanup goes right now, or nil when it can't run (no model downloaded, no key).
+    var cleanupRoute: CleanupRoute? {
+        guard cleanupEnabled else { return nil }
+        guard let p = cleanupProvider else { return models.cleanupReady ? .local(CleanupModel.file(root: models.root)) : nil }
+        guard let key = Keychain.get(p.rawValue), !key.isEmpty else { return nil }
+        return .cloud(p, key: key, model: cleanupCloudModel.trimmingCharacters(in: .whitespaces).isEmpty ? p.defaultModel : cleanupCloudModel.trimmingCharacters(in: .whitespaces))
+    }
+    /// Saves the cleanup settings and keeps the local model in memory only while it's the one in use.
+    func cleanupChanged() {
+        persistPreferences()
+        let route = cleanupRoute
+        Task { if case .local(let path)? = route { await cleanup.warm(path) } else { await cleanup.unload() } }
+    }
     func refreshPermissions() { hotkeysReady = hotkeys.start() }
     func requestAccessibility() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
@@ -151,7 +168,7 @@ enum FloatingIconAppearance: String, CaseIterable, Identifiable {
     }
     func persistPreferences() {
         let d = UserDefaults.standard
-        d.set(cleanupEnabled, forKey: "cleanupEnabled")
+        d.set(cleanupEnabled, forKey: "cleanupEnabled"); d.set(cleanupProvider?.rawValue, forKey: "cleanupProvider"); d.set(cleanupCloudModel, forKey: "cleanupCloudModel")
         d.set(mode.rawValue, forKey: "mode"); d.set(liveInsertion, forKey: "liveInsertion"); d.set(keepAudio, forKey: "keepAudio"); d.set(Int(microphoneID), forKey: "microphoneID")
     }
     func loadModel() async {
@@ -203,10 +220,10 @@ enum FloatingIconAppearance: String, CaseIterable, Identifiable {
                 let raw = try await speech.finish(recordingURL: currentAudioURL)
                 let final = TranscriptTools.applyVocabulary(raw, rules: library.vocabulary)
                 originalTranscript = final
-                if cleanupEnabled, !skipCleanup, !cancelled, !final.isEmpty {
+                if let route = cleanupRoute, !skipCleanup, !cancelled, !final.isEmpty {
                     state = "Cleaning up…"; overlayChanged?()
-                    cleanupResult = await cleanup.clean(final)
-                    cleanupStatus = cleanupResult!.status
+                    cleanupResult = await cleanup.clean(final, route: route)
+                    cleanupStatus = "\(cleanupResult!.status) · \(Int(cleanupResult!.milliseconds)) ms"
                 }
                 complete(cleanupResult?.text ?? final)
             } catch {

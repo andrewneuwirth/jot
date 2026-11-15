@@ -62,14 +62,14 @@ struct DictationPage: View {
                     .buttonStyle(.plain).help("Change the speech model")
                     HStack(spacing: 14) {
                         Toggle("Type as I speak", isOn: $model.liveInsertion)
-                        Toggle("Clean up locally", isOn: $model.cleanupEnabled).help("Removes fillers and spoken corrections with a local model in Ollama.")
+                        Toggle("Clean up", isOn: $model.cleanupEnabled).help(model.cleanupProvider.map { "Removes fillers and spoken corrections with \($0.title), using your API key. Only the transcript text is sent." } ?? "Removes fillers and spoken corrections with the cleanup model on this Mac (download it on the Models page).")
                     }
                     .toggleStyle(.checkbox).font(.system(size: 12))
                 }
             }
         }
         .onChange(of: model.liveInsertion) { _, _ in model.persistPreferences() }
-        .onChange(of: model.cleanupEnabled) { _, _ in model.persistPreferences() }
+        .onChange(of: model.cleanupEnabled) { _, _ in model.cleanupChanged() }
     }
 
     private var list: some View {

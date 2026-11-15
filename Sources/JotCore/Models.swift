@@ -87,6 +87,11 @@ public struct ModelBackend: Sendable {
     @Published public private(set) var progress: [String: Double] = [:]
     @Published public private(set) var ready: Set<String> = []
     @Published public var errors: [String: String] = [:]
+    /// The built-in cleanup model (one file, CleanupModel): download progress, nil when idle.
+    @Published public private(set) var cleanupProgress: Double?
+    @Published public private(set) var cleanupReady = false
+    @Published public var cleanupError: String?
+    private var cleanupTask: Task<Void, Never>?
     public let catalog: [SpeechModel]
     let root: URL
     let backend: ModelBackend
@@ -107,6 +112,37 @@ public struct ModelBackend: Sendable {
 
     public func refresh() {
         ready = Set(catalog.filter { m in folder(m).map { complete(m, $0) } ?? false }.map(\.id))
+        cleanupReady = CleanupModel.isPresent(root: root)
+    }
+
+    /// Downloads the cleanup model to a temporary file, checks its SHA-256 against the published one, then moves it in.
+    public func downloadCleanup(then done: (@MainActor () -> Void)? = nil) {
+        guard cleanupTask == nil else { return }
+        cleanupError = nil; cleanupProgress = 0
+        let target = CleanupModel.file(root: root)
+        cleanupTask = Task { [weak self] in
+            do {
+                let file = try await FileDownload.fetch(CleanupModel.url) { p in Task { @MainActor in if self?.cleanupProgress != nil { self?.cleanupProgress = p } } }
+                defer { try? FileManager.default.removeItem(at: file) }
+                let hash = try await Task.detached { try CleanupModel.sha256(of: file) }.value
+                guard hash == CleanupModel.sha256 else { throw URLError(.cannotDecodeContentData, userInfo: [NSLocalizedDescriptionKey: "The download didn't match its published checksum. Try again."]) }
+                try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try? FileManager.default.removeItem(at: target)
+                try FileManager.default.moveItem(at: file, to: target)
+            } catch is CancellationError {
+            } catch {
+                if !Task.isCancelled { self?.cleanupError = error.localizedDescription }
+            }
+            guard let self, !Task.isCancelled else { return }
+            self.cleanupTask = nil; self.cleanupProgress = nil; self.refresh()
+            if self.cleanupReady { done?() }
+        }
+    }
+    public func cancelCleanup() { cleanupTask?.cancel(); cleanupTask = nil; cleanupProgress = nil }
+    public func deleteCleanup() {
+        cancelCleanup()
+        try? FileManager.default.trashItem(at: CleanupModel.file(root: root), resultingItemURL: nil)
+        refresh()
     }
 
     /// Present by name and close to the published size: a half-finished or truncated download doesn't count.
@@ -152,7 +188,7 @@ public struct ModelBackend: Sendable {
     }
 
     /// Fixed states for the UI preview.
-    func preview(ready: Set<String>, progress: [String: Double]) { self.ready = ready; self.progress = progress }
+    func preview(ready: Set<String>, progress: [String: Double], cleanup: Bool = false) { self.ready = ready; self.progress = progress; cleanupReady = cleanup }
 
     public func size(_ m: SpeechModel) -> Int64 { folder(m).map(Self.bytes(in:)) ?? 0 }
 
@@ -202,5 +238,40 @@ public struct ModelBackend: Sendable {
         cancelled.cancel(model)
         try? await Task.sleep(nanoseconds: 300_000_000)
         check("models: cancel stops it without an error", cancelled.state(model) == .absent && cancelled.errors.isEmpty)
+    }
+}
+
+/// One file over HTTPS with progress, saved to a temporary file the caller moves or deletes.
+/// shortcut: no resume after an interruption; the download starts over, which is fine for a file this size.
+private final class FileDownload: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+    private let progress: @Sendable (Double) -> Void
+    private var continuation: CheckedContinuation<URL, Error>?
+    private init(progress: @escaping @Sendable (Double) -> Void) { self.progress = progress }
+
+    static func fetch(_ url: URL, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
+        let delegate = FileDownload(progress: progress)
+        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+        defer { session.finishTasksAndInvalidate() }
+        let task = session.downloadTask(with: url)
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { c in delegate.continuation = c; task.resume() }
+        } onCancel: { task.cancel() }
+    }
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData _: Int64, totalBytesWritten written: Int64, totalBytesExpectedToWrite total: Int64) {
+        if total > 0 { progress(Double(written) / Double(total)) }
+    }
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+        // The system deletes `location` when this returns, so move it first.
+        let kept = FileManager.default.temporaryDirectory.appendingPathComponent("jot-download-\(UUID().uuidString)")
+        guard (downloadTask.response as? HTTPURLResponse)?.statusCode == 200 else {
+            continuation?.resume(throwing: URLError(.badServerResponse)); continuation = nil; return
+        }
+        do { try FileManager.default.moveItem(at: location, to: kept); continuation?.resume(returning: kept) }
+        catch { continuation?.resume(throwing: error) }
+        continuation = nil
+    }
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        guard let error else { return }
+        continuation?.resume(throwing: (error as? URLError)?.code == .cancelled ? CancellationError() : error); continuation = nil
     }
 }
