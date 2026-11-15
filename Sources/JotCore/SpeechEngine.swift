@@ -120,7 +120,7 @@ public enum TranscribeCommand {
         let manager = AsrManager(config: .default)
         try await manager.loadModels(models)
         var state = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
-        // AVAudioFile reads wav/aiff/caf/m4a/mp3/flac/Ogg Opus; WebM (bb/Chromium voice notes) is demuxed here.
+        // AVAudioFile reads wav/aiff/caf/m4a/mp3/flac/Ogg Opus; WebM (Chromium voice notes) is demuxed here.
         let result: ASRResult
         if WebMOpus.isWebM(url) { result = try await manager.transcribe(WebMOpus.decode(url), decoderState: &state) }
         else { result = try await manager.transcribe(url, decoderState: &state) }

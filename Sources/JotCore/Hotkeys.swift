@@ -63,8 +63,6 @@ final class GlobalHotkeys {
             if down, !globeDown, modifiers.isEmpty { globeDown = true; DispatchQueue.main.async { [weak self] in self?.toggle?() }; return nil }
             if !down, globeDown { globeDown = false; return nil }
         }
-        // ⌃⌘V and ⌃⌘J (the mouse's top and bottom buttons) belong to Hammerspoon, which hands them to Pier
-        // (search, paste the newest screenshot). Jot used to swallow them here first.
         if type == .keyDown, code == 53, isRecording?() == true {
             DispatchQueue.main.async { [weak self] in self?.cancel?() }; return nil
         }
@@ -87,7 +85,7 @@ struct SpaceHold {
     enum Phase { case idle, pending, holding }
     enum Action: Equatable { case pass, swallow, wait, typeSpace, typeSpaceFirst, stop }
     static let delay = 0.35
-    static let defaultApps = ["dev.bb.desktop", "com.openai.chat", "com.openai.codex", "com.anthropic.claudefordesktop",
+    static let defaultApps = ["com.openai.chat", "com.openai.codex", "com.anthropic.claudefordesktop",
                               "com.apple.Terminal", "com.mitchellh.ghostty", "com.googlecode.iterm2"].joined(separator: "\n")
     private(set) var phase = Phase.idle
     mutating func key(space: Bool, down: Bool, repeating: Bool, modified: Bool, allowed: @autoclosure () -> Bool) -> Action {

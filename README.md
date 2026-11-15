@@ -5,9 +5,7 @@ A local macOS dictation and notes app. Native SwiftUI/AppKit, NVIDIA Parakeet Re
 ## Use
 
 - Globe: tap to start, tap again to finish. Escape cancels.
-- Space (bb, ChatGPT, Claude, Terminal, Ghostty, iTerm; edit in Settings → Controls): hold ≥ 0.35 s to talk, release to insert the raw transcript (no cleanup). A tap types a space; Space with modifiers is untouched.
-- Rear/bottom mouse side button: Ctrl–Command–J, toggles dictation.
-- Front/top mouse side button: Control–Command–V: delete selected editable text, otherwise paste. Ordinary keyboard Command–V is unchanged.
+- Space (ChatGPT, Claude, Terminal, Ghostty, iTerm; edit in Settings → Controls): hold ≥ 0.35 s to talk, release to insert the raw transcript (no cleanup). A tap types a space; Space with modifiers is untouched.
 - Notes: create, edit, pin, organize in folders, search, export. Formatting toolbar inserts Markdown.
 - Dictation History: recover, copy, save as a note, retry/play retained recordings.
 - Settings: actual selected model/mode, microphone, permissions, Open at Login, vocabulary, local storage and real benchmarks.

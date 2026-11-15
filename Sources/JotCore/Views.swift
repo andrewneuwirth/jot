@@ -219,7 +219,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("One explicit spelling rule per line: spoken phrase = desired spelling. These run locally after recognition; they do not train the model.").font(.caption).foregroundStyle(.secondary)
                         TextEditor(text: $library.vocabulary).font(.system(.body, design: .monospaced)).frame(height: 100).border(Color.secondary.opacity(0.2))
-                        Text("Example: tar's = Tars").font(.caption).foregroundStyle(.secondary)
+                        Text("Example: eye phone = iPhone").font(.caption).foregroundStyle(.secondary)
                     }.padding(10)
                 }.padding(16).background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 14))
                 }

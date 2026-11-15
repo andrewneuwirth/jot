@@ -52,7 +52,7 @@ final class SpaceHoldTests: XCTestCase {
         XCTAssertEqual(key(&h, down: false), .pass)
     }
     func testAllowlistMatchesBundleIDs() {
-        for id in ["dev.bb.desktop", "com.anthropic.claudefordesktop", "com.openai.chat", "com.apple.Terminal", "com.mitchellh.ghostty", "com.googlecode.iterm2"] {
+        for id in ["com.anthropic.claudefordesktop", "com.openai.chat", "com.apple.Terminal", "com.mitchellh.ghostty", "com.googlecode.iterm2"] {
             XCTAssertTrue(SpaceHold.allows(id, in: SpaceHold.defaultApps), id)
         }
         XCTAssertTrue(SpaceHold.allows("com.apple.terminal", in: "  com.apple.Terminal \n\n"))

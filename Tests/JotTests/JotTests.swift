@@ -4,7 +4,7 @@ import AVFoundation
 
 final class JotTests: XCTestCase {
     func testVocabularyOnlyReplacesWholePhrasesAndEscapesTemplates() {
-        XCTAssertEqual(TranscriptTools.applyVocabulary("tar's and stars cost ten bucks.", rules: "tar's = Tars\nten bucks = $10"), "Tars and stars cost $10.")
+        XCTAssertEqual(TranscriptTools.applyVocabulary("my eye phone and stars cost ten bucks.", rules: "eye phone = iPhone\nten bucks = $10"), "my iPhone and stars cost $10.")
         XCTAssertEqual(TranscriptTools.applyVocabulary("Cartography", rules: "art = Art"), "Cartography")
     }
     func testWordErrorRateUsesEditDistanceAndIgnoresPunctuation() {
