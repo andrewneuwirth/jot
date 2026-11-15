@@ -182,11 +182,9 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack { Label(AXIsProcessTrusted() ? "Accessibility enabled" : "Accessibility needed for shortcuts and live text", systemImage: AXIsProcessTrusted() ? "checkmark.circle" : "exclamationmark.circle"); Spacer(); Button("Enable…") { model.requestAccessibility() }; Button("Refresh") { model.refreshPermissions() } }
                         HStack { Label(AVCaptureDevice.authorizationStatus(for: .audio) == .authorized ? "Microphone enabled" : "Microphone permission needed", systemImage: "mic"); Spacer(); Button("Allow microphone") { model.requestMicrophone() } }
-                        Text(model.hotkeysReady ? "Globe and mouse shortcut listener is active." : "After enabling Accessibility, click Refresh or restart Jot.").font(.caption).foregroundStyle(.secondary)
+                        Text(model.hotkeysReady ? "Globe shortcut listener is active." : "After enabling Accessibility, click Refresh or restart Jot.").font(.caption).foregroundStyle(.secondary)
                         Picker("Microphone", selection: $model.microphoneID) { Text("System default").tag(UInt32(0)); ForEach(Microphones.list(), id: \.id) { Text($0.name).tag($0.id) } }.disabled(model.recording || model.finishing)
                         LabeledContent("Globe", value: "Tap to start · tap again to finish")
-                        LabeledContent("Rear / bottom mouse button", value: "Dictation · ⌃⌘J")
-                        LabeledContent("Front / top mouse button", value: "Paste · ⌘V")
                         LabeledContent("Escape", value: "Cancel recording")
                         Toggle("Hold Space to talk in chosen apps", isOn: $model.spaceHold)
                         if model.spaceHold {

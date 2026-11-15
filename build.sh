@@ -8,7 +8,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/Jot "$APP/Contents/MacOS/Jot"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 if [[ ! -f Resources/AppIcon.icns ]]; then
-    swift ../Kit/tools/icon.swift 338cfa waveform Resources/AppIcon.icns   # the Mac Tools family plate
+    swift ../Kit/tools/icon-tile.swift 338cfa waveform Resources/AppIcon.icns   # the Dispatch-style tile
 fi
 cp Resources/AppIcon.icns "$APP/Contents/Resources/"
 for resource in .build/release/*.bundle(N); do cp -R "$resource" "$APP/Contents/Resources/"; done

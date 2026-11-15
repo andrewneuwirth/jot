@@ -11,8 +11,6 @@ final class GlobalHotkeys {
     private var tap: CFMachPort?
     private var source: CFRunLoopSource?
     private var globeDown = false
-    private var swallowedJ = false
-    private var swallowedV = false
     private var spaceHold = SpaceHold()
     private var holdTimer: DispatchWorkItem?
     private static let synthetic: Int64 = 0x4A6F74
@@ -31,7 +29,7 @@ final class GlobalHotkeys {
     }
     private func handle(_ type: CGEventType, _ event: CGEvent) -> Unmanaged<CGEvent>? {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            globeDown = false; swallowedJ = false; swallowedV = false
+            globeDown = false
             holdTimer?.cancel()
             if spaceHold.reset() { DispatchQueue.main.async { [weak self] in self?.holdToTalk?(false) } }
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
@@ -65,24 +63,8 @@ final class GlobalHotkeys {
             if down, !globeDown, modifiers.isEmpty { globeDown = true; DispatchQueue.main.async { [weak self] in self?.toggle?() }; return nil }
             if !down, globeDown { globeDown = false; return nil }
         }
-        if code == 9 {
-            if type == .keyUp, swallowedV {
-                swallowedV = false
-                DispatchQueue.main.async { [weak self] in self?.smartPaste?() }
-                return nil
-            }
-            if type == .keyDown, event.flags.intersection([.maskControl, .maskCommand, .maskAlternate, .maskShift]) == [.maskControl, .maskCommand] {
-                swallowedV = true
-                return nil
-            }
-        }
-        if code == 38 {
-            if type == .keyUp, swallowedJ { swallowedJ = false; return nil }
-            if type == .keyDown, event.flags.intersection([.maskControl, .maskCommand, .maskAlternate, .maskShift]) == [.maskControl, .maskCommand] {
-                if !swallowedJ { swallowedJ = true; DispatchQueue.main.async { [weak self] in self?.toggle?() } }
-                return nil
-            }
-        }
+        // ⌃⌘V and ⌃⌘J (the mouse's top and bottom buttons) belong to Hammerspoon, which hands them to Pier
+        // (search, paste the newest screenshot). Jot used to swallow them here first.
         if type == .keyDown, code == 53, isRecording?() == true {
             DispatchQueue.main.async { [weak self] in self?.cancel?() }; return nil
         }
